@@ -1,0 +1,1034 @@
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+    CBadge, CButton, CCard, CCardBody, CCardHeader, CCol, CFormInput, CRow,
+    CTable, CTableBody, CTableDataCell, CTableHead, CTableHeaderCell, CTableRow,
+    CSpinner, CInputGroup, CInputGroupText, CModal, CModalHeader, CModalTitle,
+    CModalBody, CModalFooter
+} from '@coreui/react';
+import { CTooltip } from '@coreui/react';
+import CIcon from '@coreui/icons-react';
+import { cilAperture, cilHistory, cilMoney, cilCloudDownload } from '@coreui/icons';
+import { useToast } from '../../common/toast/ToastContext';
+import { getAPICall, postAPICall, put } from '../../../util/api';
+import OrderList from './OrderList';
+import AdvanceInvoice from './AdvanceInvoice';
+import { getUserData } from '../../../util/session';
+import html2pdf from 'html2pdf.js';
+
+const EyeIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-eye" viewBox="0 0 16 16">
+        <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z" />
+        <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z" />
+    </svg>
+);
+
+const ProjectPaymentReport = () => {
+    const { showToast } = useToast();
+
+    // -------------------------------------------------
+    // 1. Current company (from session)
+    // -------------------------------------------------
+    const companyId = getUserData()?.company_id;
+    if (!companyId) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+                <p className="text-muted">Unable to determine company. Please log in again.</p>
+            </div>
+        );
+    }
+
+    // -------------------------------------------------
+    // 2. State
+    // -------------------------------------------------
+    const [payments, setPayments] = useState([]);
+    const [selectedInvoice, setSelectedInvoice] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchInput, setSearchInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [showOrderModal, setShowOrderModal] = useState(false);
+    const [selectedProjectId, setSelectedProjectId] = useState(null);
+    const [showRepaymentModal, setShowRepaymentModal] = useState(false);
+    const [repaymentAmount, setRepaymentAmount] = useState('');
+    const [projectId, setProjectId] = useState(null);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [historyData, setHistoryData] = useState([]);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [selectedPayment, setSelectedPayment] = useState(null);
+    const [payAmount, setPayAmount] = useState('');
+    // Advance-payment modal
+    const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+    const [advanceCustomer, setAdvanceCustomer] = useState('');
+    const [advanceAmount, setAdvanceAmount] = useState('');
+    const [allCustomers, setAllCustomers] = useState([]);
+
+    const [isClearingAdvance, setIsClearingAdvance] = useState(false);
+    const [showAdvanceInvoiceModal, setShowAdvanceInvoiceModal] = useState(false);
+    const [additionalAmount, setAdditionalAmount] = useState('');
+    const [useAdvance, setUseAdvance] = useState(false);
+
+
+    // -------------------------------------------------
+    // 3. Data fetching (company-scoped)
+    // -------------------------------------------------
+    const fetchPayments = async () => {
+        setIsLoading(true);
+        try {
+            const resp = await getAPICall(`/api/project-payments?company_id=${companyId}`);
+            setPayments(Array.isArray(resp) ? resp : []);
+        } catch (err) {
+            showToast('danger', 'Error fetching project payments: ' + (err?.message || err));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchAllCustomers = async () => {
+        try {
+            const resp = await getAPICall('/api/projects');
+            if (!Array.isArray(resp)) {
+                setAllCustomers([]);
+                return;
+            }
+
+            const unique = {};
+            resp.forEach(proj => {
+                // ---- filter by company ----
+                if (proj.company_id !== companyId) return;
+
+                const name = proj.customer_name?.trim();
+                if (!name) return;
+
+                if (!unique[name]) {
+                    unique[name] = { name, mobile: proj.mobile_number || '', projects: [] };
+                }
+                unique[name].projects.push({ id: proj.id, company_id: proj.company_id });
+            });
+            setAllCustomers(Object.values(unique));
+        } catch (err) {
+            console.error(err);
+            setAllCustomers([]);
+        }
+    };
+
+    const fetchHistory = async () => {
+        if (!projectId) return;
+        setIsLoading(true);
+        try {
+            const resp = await getAPICall(
+                `/api/repayments?company_id=${companyId}&project_id=${projectId}`
+            );
+            setHistoryData(Array.isArray(resp) ? resp : []);
+        } catch (err) {
+            showToast('danger', 'Error fetching history: ' + (err?.message || err));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // -------------------------------------------------
+    // 4. Effects
+    // -------------------------------------------------
+    useEffect(() => {
+        fetchPayments();
+        fetchAllCustomers();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [companyId]);
+
+    useEffect(() => {
+        if (projectId) fetchHistory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectId, companyId]);
+
+    // -------------------------------------------------
+    // 5. Helpers
+    // -------------------------------------------------
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        return new Date(dateStr).toLocaleDateString('en-GB');
+    };
+
+    const formatCurrency = (value) => `₹${Number(value || 0).toFixed(2)}`;
+
+    // -------------------------------------------------
+    // 6. Memoised company-only data
+    // -------------------------------------------------
+    const companyPayments = useMemo(() => {
+        return payments.filter(p => p.company_id === companyId);
+    }, [payments, companyId]);
+
+    const groupedCustomers = useMemo(() => {
+        const groups = {};
+        companyPayments.forEach(p => {
+            const cust = p.project?.customer_name || 'Unknown';
+            if (!groups[cust]) groups[cust] = [];
+            groups[cust].push(p);
+        });
+
+        if (searchTerm) {
+            const lower = searchTerm.toLowerCase();
+            return Object.fromEntries(
+                Object.entries(groups).filter(([c]) => c.toLowerCase().includes(lower))
+            );
+        }
+        return groups;
+    }, [companyPayments, searchTerm]);
+
+    const summaryStats = useMemo(() => {
+        const customerEntries = Object.values(groupedCustomers);
+        const flattened = customerEntries.flat();
+        const nonAdvancePayments = flattened.filter(p => !p.is_advance);
+
+        const customerCount = customerEntries.length;
+        const totalInvoices = flattened.length;
+        const totalBilled = nonAdvancePayments.reduce((sum, p) => sum + Number(p.total || 0), 0);
+        const totalPaid = nonAdvancePayments.reduce((sum, p) => sum + Number(p.paid_amount || 0), 0);
+        const totalOutstanding = totalBilled - totalPaid;
+
+        return {
+            customerCount,
+            totalInvoices,
+            totalBilled,
+            totalPaid,
+            totalOutstanding,
+        };
+    }, [groupedCustomers]);
+
+    // -------------------------------------------------
+    // 7. Loading spinner
+    // -------------------------------------------------
+    if (isLoading && !payments.length) {
+        return (
+            <div className="d-flex flex-column justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+                <CSpinner color="primary" size="lg" />
+                <p className="mt-3 text-muted">Loading project payments...</p>
+            </div>
+        );
+    }
+
+    // -------------------------------------------------
+    // 8. Payment update (single invoice)
+    // -------------------------------------------------
+    const callPayment = async () => {
+        if (!selectedPayment || !payAmount || Number(payAmount) <= 0) return;
+
+        const amountToPay = Number(payAmount);
+        const newPaid = Number(selectedPayment.paid_amount) + amountToPay;
+        const remaining = Number(selectedPayment.total) - newPaid;
+
+        try {
+            // 1. Update project-payment record — preserve payment_mode
+            const updatePayload = {
+                paid_amount: newPaid,
+                // Explicitly preserve existing payment_mode
+                payment_mode: selectedPayment.payment_mode || null,
+            };
+
+            const resp = await fetch(`/api/project-payments/${selectedPayment.id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload),
+            });
+
+            if (!resp.ok) {
+                const errorText = await resp.text();
+                throw new Error(`Failed to update payment: ${errorText}`);
+            }
+
+            showToast('success', 'Payment updated successfully');
+        } catch (e) {
+            console.error('Payment update error:', e);
+            showToast('danger', 'Failed to update payment: ' + e.message);
+            return;
+        }
+
+        // 2. Record repayment entry
+        const today = new Date().toISOString().split('T')[0];
+        const repaymentPayload = {
+            company_id: companyId,
+            project_id: selectedPayment.project?.id,
+            invoice_id: selectedPayment.invoice_number,
+            payment: amountToPay,
+            total: selectedPayment.total,
+            remaining: remaining,
+            is_completed: remaining <= 0,
+            date: today,
+        };
+
+        try {
+            await fetch('/api/repayment/single', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(repaymentPayload),
+            });
+
+            // Reset and refresh
+            setPayAmount('');
+            setShowPaymentModal(false);
+            fetchPayments();
+            if (projectId) fetchHistory();
+        } catch (e) {
+            console.error('Repayment recording error:', e);
+            showToast('danger', 'Payment recorded but history failed to save.');
+        }
+    };
+
+    // -------------------------------------------------
+    // 9. Customer list view
+    // -------------------------------------------------
+    if (!selectedCustomer) {
+        return (
+            <>
+                <CRow>
+                    <CCol xs={12}>
+                        <CCard className="shadow-sm">
+                            <CCardHeader className="bg-light d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong className="fs-5">Customers Payment Report</strong>
+                                    <CBadge color="info" className="ms-2">
+                                        {summaryStats.customerCount} customers
+                                    </CBadge>
+                                </div>
+                                {/* <CButton color="primary" size="sm" onClick={() => setShowAdvanceModal(true)}>
+                                    Advance Payment
+                                </CButton> */}
+                            </CCardHeader>
+
+                            <CCardBody>
+                                {/* Search */}
+                                <CRow className="mb-2">
+                                    <CCol xs={12} md={6}>
+                                        <CInputGroup>
+                                            <CInputGroupText>Search</CInputGroupText>
+                                            <CFormInput
+                                                placeholder="Search by customer name..."
+                                                value={searchInput}
+                                                onChange={e => {
+                                                    setSearchInput(e.target.value);
+                                                    setSearchTerm(e.target.value);
+                                                }}
+                                            />
+                                        </CInputGroup>
+                                    </CCol>
+                                    {searchTerm && (
+                                        <CCol xs={12} md={3} className="mt-2 mt-md-0">
+                                            <CButton
+                                                color="light"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setSearchInput('');
+                                                    setSearchTerm('');
+                                                }}
+                                            >
+                                                Clear
+                                            </CButton>
+                                        </CCol>
+                                    )}
+                                </CRow>
+
+                                {/* Summary cards */}
+                                <CRow className="g-2 mb-3">
+                                    <CCol xs={6} md={3}>
+                                        <div className="rounded p-2 text-center bg-primary text-white shadow-sm">
+                                            <small className="d-block">Invoices</small>
+                                            <strong className="fs-6">{summaryStats.totalInvoices}</strong>
+                                        </div>
+                                    </CCol>
+                                    <CCol xs={6} md={3}>
+                                        <div className="rounded p-2 text-center bg-success text-white shadow-sm">
+                                            <small className="d-block">Total Billed</small>
+                                            <strong className="fs-6">{formatCurrency(summaryStats.totalBilled)}</strong>
+                                        </div>
+                                    </CCol>
+                                    <CCol xs={6} md={3}>
+                                        <div className="rounded p-2 text-center bg-warning text-dark shadow-sm">
+                                            <small className="d-block">Paid</small>
+                                            <strong className="fs-6">{formatCurrency(summaryStats.totalPaid)}</strong>
+                                        </div>
+                                    </CCol>
+                                    <CCol xs={6} md={3}>
+                                        <div className="rounded p-2 text-center bg-info text-white shadow-sm">
+                                            <small className="d-block">Outstanding</small>
+                                            <strong className="fs-6">{formatCurrency(summaryStats.totalOutstanding)}</strong>
+                                        </div>
+                                    </CCol>
+                                </CRow>
+
+                                {/* Table */}
+                                <div className="table-responsive">
+                                    <CTable striped hover bordered>
+                                        <CTableHead>
+                                            <CTableRow>
+                                                <CTableHeaderCell className="text-center align-middle">Sr. No.</CTableHeaderCell>
+                                                <CTableHeaderCell className="text-center align-middle">Customer Name</CTableHeaderCell>
+                                                <CTableHeaderCell className="text-center align-middle">Total</CTableHeaderCell>
+                                                <CTableHeaderCell className="text-center align-middle">Paid</CTableHeaderCell>
+                                                <CTableHeaderCell className="text-center align-middle">Remaining</CTableHeaderCell>
+                                                <CTableHeaderCell className="text-center align-middle">Action</CTableHeaderCell>
+                                            </CTableRow>
+                                        </CTableHead>
+                                        <CTableBody>
+                                            {Object.entries(groupedCustomers).map(([cust, recs], idx) => {
+                                                // Exclude advance payments (is_advance == 1) from calculations
+                                                const nonAdvancePayments = recs.filter(p => !p.is_advance);
+                                                const total = nonAdvancePayments.reduce((s, p) => s + Number(p.total || 0), 0);
+                                                const paid = nonAdvancePayments.reduce((s, p) => s + Number(p.paid_amount || 0), 0);
+                                                const rem = total - paid;
+                                                return (
+                                                    <CTableRow key={cust}>
+                                                        <CTableDataCell>{idx + 1}</CTableDataCell>
+                                                        <CTableDataCell>{cust}</CTableDataCell>
+                                                        <CTableDataCell className="text-end">₹{total.toFixed(2)}</CTableDataCell>
+                                                        <CTableDataCell className="text-success fw-bold text-end">₹{paid.toFixed(2)}</CTableDataCell>
+                                                        <CTableDataCell className="text-danger fw-bold text-end">₹{rem.toFixed(2)}</CTableDataCell>
+                                                        <CTableDataCell className="text-center">
+                                                            <CButton
+                                                                size="sm"
+                                                                color="info"
+                                                                onClick={() => {
+                                                                    setSelectedCustomer(cust);
+                                                                    setProjectId(recs[0].project_id);
+                                                                }}
+                                                            >
+                                                                View Invoices
+                                                            </CButton>
+                                                        </CTableDataCell>
+                                                    </CTableRow>
+                                                );
+                                            })}
+                                        </CTableBody>
+                                    </CTable>
+                                </div>
+                            </CCardBody>
+                        </CCard>
+                    </CCol>
+                </CRow>
+
+                {/* Advance Payment Modal */}
+                <CModal visible={showAdvanceModal} onClose={() => {
+                    setShowAdvanceModal(false);
+                    setAdvanceCustomer('');
+                    setAdvanceAmount('');
+                }}>
+                    <CModalHeader><CModalTitle>Advance Payment</CModalTitle></CModalHeader>
+                    <CModalBody>
+                        <div className="mb-3">
+                            <label className="form-label">Customer</label>
+                            <select className="form-select" value={advanceCustomer} onChange={e => setAdvanceCustomer(e.target.value)}>
+                                <option value="">-- Select --</option>
+                                {allCustomers.map(c => (
+                                    <option key={c.name} value={c.name}>
+                                        {c.name} {c.mobile ? `(${c.mobile})` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="form-label">Amount</label>
+                            <CFormInput
+                                type="number"
+                                placeholder="Enter amount"
+                                value={advanceAmount}
+                                onChange={e => setAdvanceAmount(e.target.value)}
+                                min="0"
+                            />
+                        </div>
+                    </CModalBody>
+                    <CModalFooter>
+                        <CButton color="secondary" onClick={() => setShowAdvanceModal(false)}>Cancel</CButton>
+                        <CButton color="primary" onClick={async () => {
+                            if (!advanceCustomer) return showToast('danger', 'Select a customer');
+                            const amt = Number(advanceAmount);
+                            if (!amt || amt <= 0) return showToast('danger', 'Enter a valid amount');
+
+                            const cust = allCustomers.find(c => c.name === advanceCustomer);
+                            if (!cust?.projects?.length) return showToast('danger', 'No project for this customer');
+
+                            const { id: projId, company_id: compId } = cust.projects[0];
+                            try {
+                                await postAPICall('/api/advance-payment', {
+                                    company_id: compId,
+                                    project_id: projId,
+                                    amount: amt,
+                                });
+                                showToast('success', 'Advance payment recorded');
+                                setShowAdvanceModal(false);
+                                setAdvanceCustomer('');
+                                setAdvanceAmount('');
+                                fetchPayments();
+                            } catch (e) {
+                                showToast('danger', 'Failed: ' + (e?.message || 'Unknown error'));
+                            }
+                        }}>
+                            Submit
+                        </CButton>
+                    </CModalFooter>
+                </CModal>
+            </>
+        );
+    }
+
+    // -------------------------------------------------
+    // 10. Selected customer invoice view
+    // -------------------------------------------------
+    const customerPayments = groupedCustomers[selectedCustomer] || [];
+    // Exclude advance payments (is_advance == 1) from total and paid calculations
+    const nonAdvancePayments = customerPayments.filter(p => !p.is_advance);
+    const total = nonAdvancePayments.reduce((s, p) => s + Number(p.total || 0), 0);
+    const paid = nonAdvancePayments.reduce((s, p) => s + Number(p.paid_amount || 0), 0);
+    const remaining = total - paid;
+
+    // Calculate advance paid from repayments where is_advance == 1 and advance_taken == 0
+    const advancePaid = (historyData || [])
+        .filter(r => r.is_advance && !r.advance_taken)
+        .reduce((sum, r) => sum + Number(r.payment || 0), 0);
+
+
+    const handleRepaymentSubmit = async () => {
+        const addAmt = Number(additionalAmount) || 0;
+        const advAmt = useAdvance ? advancePaid : 0;
+        const totalPay = addAmt + advAmt;
+
+        if (totalPay <= 0) return showToast('danger', 'Total payment must be greater than 0');
+        if (totalPay > remaining) return showToast('danger', 'Total amount exceeds remaining balance');
+
+        try {
+            // 1️⃣ Record the repayment
+            await postAPICall('/api/repayments', { project_id: projectId, payment: totalPay });
+
+            // 2️⃣ If advance is being cleared, mark all advance payments as taken
+            if (useAdvance) {
+                try {
+                    const data = await put('/api/repayments/mark-advance-taken', {
+                        company_id: companyId,
+                        project_id: projectId,
+                    });
+
+                    if (data.success) {
+                        showToast('success', data.message || 'Advance payments marked as cleared');
+                    } else {
+                        showToast('warning', data.message || 'Advance status update failed');
+                    }
+                } catch (advErr) {
+                    console.error('Advance clear update failed:', advErr);
+                    showToast('warning', 'Repayment saved, but advance status update failed: ' + (advErr.message || 'Unknown error'));
+                }
+            }
+
+            // 3️⃣ Reset UI
+            showToast('success', 'Payment recorded successfully');
+            setShowRepaymentModal(false);
+            setAdditionalAmount('');
+            setUseAdvance(false);
+            fetchPayments();
+            fetchHistory();
+        } catch (e) {
+            showToast('danger', 'Error: ' + (e?.message || e));
+        }
+    };
+
+    const handleDownloadHistoryPDF = async () => {
+        const payment = payments.find(p => p.invoice_number === selectedInvoice);
+        if (!payment) return;
+
+        const filteredHistory = historyData.filter(e => e?.invoice_id === selectedInvoice);
+        if (filteredHistory.length === 0) {
+            showToast('warning', 'No history to download');
+            return;
+        }
+
+        const ci = getUserData()?.company_info;
+        if (!ci) {
+            alert('Company information not found. Please log in again.');
+            return;
+        }
+
+        const customerName = payment.project?.customer_name || 'N/A';
+        const invoiceType = payment.is_fixed_bid == 1 ? 'FIXED BID INVOICE' : 'INVOICE';
+        const totalAmount = Number(payment.total || 0).toFixed(2);
+        const paidAmount = Number(payment.paid_amount || 0).toFixed(2);
+        const remainingAmount = (Number(payment.total) - Number(payment.paid_amount)).toFixed(2);
+
+        // Build history rows
+        const historyRows = filteredHistory.map((item, index) => `
+            <tr>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">${index + 1}</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">
+                    ${item?.date ? item.date.slice(0, 10).split('-').reverse().join('-') : '-'}
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${Number(item.payment).toFixed(2)}</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${Number(item.remaining).toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        const pdfContent = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+                <!-- Header Section -->
+                <div style="border-bottom: 3px solid #0d6efd; padding-bottom: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="flex: 1;">
+                            ${ci.logo ? `<img src="/img/${ci.logo}" alt="Logo" style="max-width: 120px; height: auto;" />` : ''}
+                        </div>
+                        <div style="text-align: right; flex: 1;">
+                            <h2 style="margin: 0; color: #333; font-size: 24px;">${ci.company_name || ''}</h2>
+                            <p style="margin: 5px 0; color: #666; font-size: 14px;">${ci.land_mark || ''}, ${ci.Tal || ''}, ${ci.Dist || ''}</p>
+                            <p style="margin: 5px 0; color: #666; font-size: 14px;">Pincode: ${ci.pincode || ''}</p>
+                            <p style="margin: 5px 0; color: #666; font-size: 14px;">Phone: ${ci.phone_no || ''}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Title -->
+                <div style="text-align: center; background-color: #0d6efd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                    <h2 style="margin: 0; color: #fff; font-size: 20px;">PAYMENT HISTORY - ${invoiceType}</h2>
+                </div>
+
+                <!-- Invoice & Customer Details -->
+                <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+                    <div style="flex: 1;">
+                        <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Invoice Details</h3>
+                        <p style="margin: 5px 0;"><strong>Invoice Number:</strong> ${payment.invoice_number}</p>
+                        <p style="margin: 5px 0;"><strong>Date:</strong> ${formatDate(payment.created_at)}</p>
+                        <p style="margin: 5px 0;"><strong>Total Amount:</strong> ₹${totalAmount}</p>
+                        <p style="margin: 5px 0;"><strong>Paid Amount:</strong> ₹${paidAmount}</p>
+                        <p style="margin: 5px 0;"><strong>Remaining:</strong> ₹${remainingAmount}</p>
+                    </div>
+                    <div style="flex: 1;">
+                        <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Customer Details</h3>
+                        <p style="margin: 5px 0;"><strong>Customer Name:</strong> ${customerName}</p>
+                        <p style="margin: 5px 0;"><strong>Mobile:</strong> ${payment.project?.mobile_number || '-'}</p>
+                        <p style="margin: 5px 0;"><strong>Site:</strong> ${payment.project?.work_place || '-'}</p>
+                    </div>
+                </div>
+
+                <!-- History Table -->
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+                    <thead>
+                        <tr style="background-color: #f8f9fa;">
+                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Sr. No.</th>
+                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Date</th>
+                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Paid Amount</th>
+                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Remaining</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${historyRows}
+                    </tbody>
+                </table>
+
+                <!-- Footer -->
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; text-align: center; color: #666; font-size: 12px;">
+                    <p>This is a computer-generated document and is valid without signature.</p>
+                </div>
+            </div>
+        `;
+
+        const element = document.createElement('div');
+        element.innerHTML = pdfContent;
+
+        const options = {
+            margin: [10, 10, 10, 10],
+            filename: `History-${payment.invoice_number}-${customerName}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        };
+
+        try {
+            await html2pdf().set(options).from(element).save();
+            showToast('success', 'History PDF downloaded successfully');
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            showToast('danger', 'Failed to generate PDF');
+        }
+    };
+
+
+
+
+
+    return (
+        <>
+            <CRow>
+                <CCol xs={12}>
+                    <CCard className="shadow-sm">
+                        <CCardHeader className="bg-light d-flex justify-content-between align-items-center flex-wrap">
+                            <div>
+                                <strong className="fs-5">Invoices for {selectedCustomer}</strong>
+                                <CBadge color="info" className="ms-2">{customerPayments.length} entries</CBadge>
+                            </div>
+                            <div className="d-flex gap-2 mt-2 mt-md-0">
+                                <CButton color="success" onClick={() => {
+                                    setShowRepaymentModal(true);
+                                    // Logic to auto-select advance if applicable
+                                    const canUseAdvance = advancePaid > 0 && advancePaid <= remaining;
+                                    setUseAdvance(canUseAdvance);
+                                    setAdditionalAmount('');
+                                }}>
+                                    Record Payment
+                                </CButton>
+                                <CButton color="secondary" size="sm" onClick={() => setSelectedCustomer(null)}>
+                                    Back
+                                </CButton>
+                            </div>
+                        </CCardHeader>
+
+                        <CCardBody>
+                            {/* Summary cards */}
+                            <CRow className="g-2 mb-2">
+                                {/* <CCol xs={6} md={3}>
+                                    <div className="p-2 rounded bg-primary text-center text-white shadow-sm">
+                                        <small>Total Payments</small>
+                                        <div className="fw-semibold fs-6 mt-1">{customerPayments.length}</div>
+                                    </div>
+                                </CCol> */}
+                                <CCol xs={6} md={3}>
+                                    <div className="p-2 rounded bg-primary text-center text-white shadow-sm">
+                                        <small>Total</small>
+                                        <div className="fw-semibold fs-6 mt-1">₹{total.toFixed(2)}</div>
+                                    </div>
+                                </CCol>
+                                <CCol xs={6} md={3}>
+                                    <div className="p-2 rounded bg-success text-center text-white shadow-sm">
+                                        <small>Paid</small>
+                                        <div className="fw-semibold fs-6 mt-1">₹{paid.toFixed(2)}</div>
+                                    </div>
+                                </CCol>
+                                <CCol xs={6} md={3}>
+                                    <div className="p-2 rounded bg-danger text-center text-white shadow-sm">
+                                        <small>Remaining</small>
+                                        <div className="fw-semibold fs-6 mt-1">₹{remaining.toFixed(2)}</div>
+                                    </div>
+                                </CCol>
+                                <CCol xs={6} md={3}>
+                                    <div className="p-2 rounded bg-secondary text-center text-white shadow-sm">
+                                        <small>Advance</small>
+                                        <div className="fw-semibold fs-6 mt-1">₹{advancePaid.toFixed(2)}</div>
+                                    </div>
+                                </CCol>
+                            </CRow>
+
+
+                            {/* Invoices table */}
+                            <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                                <CTable hover bordered>
+                                    <CTableHead style={{ position: 'sticky', top: 0, backgroundColor: '#f8f9fa' }}>
+                                        <CTableRow>
+                                            <CTableHeaderCell className="text-center align-middle">Sr. No.</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle">Invoice</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle">Date</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle">Total</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle">Paid</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle" >Remaining</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle">Mode</CTableHeaderCell>
+                                            <CTableHeaderCell className="text-center align-middle">Action</CTableHeaderCell>
+                                        </CTableRow>
+                                    </CTableHead>
+                                    <CTableBody>
+                                        {customerPayments
+                                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                                            .map((p, i) => {
+                                                const rem = (Number(p.total) - Number(p.paid_amount)).toFixed(2);
+                                                return (
+                                                    <CTableRow
+                                                        key={p.id}
+                                                        className={p.is_advance == 1 ? "table-primary" : p.is_fixed_bid == 1 ? "table-warning" : ""} // Bootstrap v5 utility
+                                                    >
+                                                        <CTableDataCell>{i + 1}</CTableDataCell>
+                                                        <CTableDataCell>
+                                                            {p.is_advance == 1 ? "Advance Payment" :
+                                                                p.invoice_number}
+                                                        </CTableDataCell>
+                                                        <CTableDataCell className="text-center align-middle">{formatDate(p.created_at)}</CTableDataCell>
+                                                        <CTableDataCell className="text-end fw-bold">₹{Number(p.total).toFixed(2)}</CTableDataCell>
+                                                        <CTableDataCell className="text-success fw-bold text-end">₹{Number(p.paid_amount).toFixed(2)}</CTableDataCell>
+                                                        <CTableDataCell className="text-danger fw-bold text-end">₹{rem}</CTableDataCell>
+                                                        <CTableDataCell>{p.payment_mode || '-'}</CTableDataCell>
+                                                        <CTableDataCell className="text-center">
+                                                            <div className="d-flex justify-content-center gap-1">
+                                                                {p.is_advance == 0 && (<CTooltip content="Add Payment" placement="top">
+                                                                    <CButton
+                                                                        color="success"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setSelectedPayment(p);
+                                                                            setShowPaymentModal(true);
+                                                                        }}
+                                                                    >
+                                                                        <CIcon icon={cilMoney} />
+                                                                    </CButton>
+                                                                </CTooltip>)}
+
+                                                                {p.is_advance == 0 && (<CTooltip content="Payment History" placement="top">
+                                                                    <CButton
+                                                                        color="info"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            setSelectedInvoice(p.invoice_number);
+                                                                            setShowHistoryModal(true);
+                                                                        }}
+                                                                    >
+                                                                        <CIcon icon={cilHistory} />
+                                                                    </CButton>
+                                                                </CTooltip>)}
+
+                                                                <CTooltip content={p.is_advance == 1 ? 'View Advance Invoice' : p.is_fixed_bid == 1 ? 'View Fixed Bid Invoice' : 'View Invoice'} placement="top">
+                                                                    <CButton
+                                                                        color={p.is_advance == 1 || p.is_fixed_bid == 1 ? 'warning' : 'secondary'}
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            if (p.is_advance == 1 || p.is_fixed_bid == 1) {
+                                                                                // Open Advance Invoice modal (reusing for fixed bid for now if structure is same, or just view)
+                                                                                // For now, let's treat it same as advance invoice view
+                                                                                setSelectedProjectId(p.id);
+                                                                                setShowAdvanceInvoiceModal(true);
+                                                                            } else {
+                                                                                // Normal Invoice
+                                                                                setSelectedProjectId(p.id);
+                                                                                setShowOrderModal(true);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <EyeIcon />
+                                                                    </CButton>
+                                                                </CTooltip>
+                                                            </div>
+                                                        </CTableDataCell>
+                                                    </CTableRow>
+                                                );
+                                            })}
+                                    </CTableBody>
+                                </CTable>
+                            </div>
+                        </CCardBody>
+                    </CCard>
+                </CCol>
+            </CRow>
+
+            {/* Advance Invoice Modal */}
+            <CModal
+                visible={showAdvanceInvoiceModal}
+                onClose={() => setShowAdvanceInvoiceModal(false)}
+                size="xl"
+                backdrop="static"
+            >
+                <CModalHeader>
+                    <CModalTitle>
+                        {payments.find(p => p.id === selectedProjectId)?.is_fixed_bid == 1
+                            ? 'Fixed Bid Invoice'
+                            : 'Advance Invoice'}
+                    </CModalTitle>
+                </CModalHeader>
+                <CModalBody style={{ overflowY: 'visible', padding: 0 }}>
+                    <AdvanceInvoice paymentId={selectedProjectId} />
+                </CModalBody>
+            </CModal>
+
+
+            {/* Repayment modal */}
+            <CModal visible={showRepaymentModal} onClose={() => setShowRepaymentModal(false)}>
+                <CModalHeader>
+                    <CModalTitle>Add Repayment - {selectedCustomer}</CModalTitle>
+                </CModalHeader>
+                <CModalBody>
+                    <p><strong>Total :</strong> ₹{total.toFixed(2)}</p>
+
+                    <p className="mb-1">
+                        <strong>Advance Paid:</strong>{' '}
+                        <span className="text-success">₹{advancePaid.toFixed(2)}</span>
+                    </p>
+
+                    <p className="mb-1">
+                        <strong>Paid :</strong>{' '}
+                        <span className="text-success">₹{paid.toFixed(2)}</span>
+                    </p>
+                    <p className="mb-3">
+                        <strong>Remaining :</strong>{' '}
+                        <span className="text-danger">₹{remaining.toFixed(2)}</span>
+                    </p>
+
+                    <hr />
+
+                    {remaining > 0 ? (
+                        <>
+                            {/* Logic: If advance <= remaining, show checkbox to use it */}
+                            {advancePaid > 0 && advancePaid <= remaining ? (
+                                <div className="mb-3">
+                                    <div className="form-check mb-2">
+                                        <input
+                                            className="form-check-input"
+                                            type="checkbox"
+                                            id="useAdvanceCheck"
+                                            checked={useAdvance}
+                                            onChange={(e) => setUseAdvance(e.target.checked)}
+                                        />
+                                        <label className="form-check-label" htmlFor="useAdvanceCheck">
+                                            Clear from Advance (₹{advancePaid.toFixed(2)})
+                                        </label>
+                                    </div>
+
+                                    <label className="form-label">Additional Amount</label>
+                                    <CFormInput
+                                        type="number"
+                                        placeholder="Enter additional amount"
+                                        value={additionalAmount}
+                                        onChange={e => setAdditionalAmount(e.target.value)}
+                                        min="0"
+                                    />
+
+                                    <div className="mt-2 text-end">
+                                        <strong>Total Payment: </strong>
+                                        ₹{((useAdvance ? advancePaid : 0) + (Number(additionalAmount) || 0)).toFixed(2)}
+                                    </div>
+                                </div>
+                            ) : (
+                                // If advance > remaining OR advance is 0, just show standard input
+                                // (User requested: "When advance payment > Remaining amount then dont show the option to clear from advance")
+                                <div className="mb-3">
+                                    <label className="form-label">Amount</label>
+                                    <CFormInput
+                                        type="number"
+                                        placeholder="Enter amount to pay"
+                                        value={additionalAmount}
+                                        onChange={e => setAdditionalAmount(e.target.value)}
+                                        min="0"
+                                    />
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="alert alert-success text-center">
+                            Payment Complete! No outstanding balance.
+                        </div>
+                    )}
+
+                </CModalBody>
+                <CModalFooter>
+                    <CButton color="secondary" onClick={() => {
+                        setShowRepaymentModal(false);
+                        setUseAdvance(false);
+                        setAdditionalAmount('');
+                    }}>
+                        Cancel
+                    </CButton>
+                    <CButton color="primary" onClick={handleRepaymentSubmit} disabled={remaining <= 0}>
+                        Submit
+                    </CButton>
+                </CModalFooter>
+            </CModal>
+
+
+            {/* History modal */}
+            {/* History modal */}
+            <CModal visible={showHistoryModal} onClose={() => setShowHistoryModal(false)} size="lg">
+                <CModalHeader>
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                        <CModalTitle>Payment History</CModalTitle>
+                        <CButton 
+                            color="success" 
+                            size="sm" 
+                            className="me-4"
+                            onClick={handleDownloadHistoryPDF}
+                            title="Download History PDF"
+                        >
+                            <CIcon icon={cilCloudDownload} className="me-1" />
+                            Download PDF
+                        </CButton>
+                    </div>
+                </CModalHeader>
+                <CModalBody>
+                    {historyData.filter(e => e?.invoice_id === selectedInvoice).length > 0 ? (
+                        <div className="table-responsive">
+                            <CTable striped hover bordered>
+                                <CTableHead color="dark">
+                                    <CTableRow>
+                                        <CTableHeaderCell>Date</CTableHeaderCell>
+                                        <CTableHeaderCell>Paid</CTableHeaderCell>
+                                        <CTableHeaderCell>Remaining</CTableHeaderCell>
+                                    </CTableRow>
+                                </CTableHead>
+                                <CTableBody>
+                                    {historyData
+                                        .filter(e => e?.invoice_id === selectedInvoice)
+                                        .map((e, i) => (
+                                            <CTableRow key={i}>
+                                                <CTableDataCell>
+                                                    {e?.date ? e.date.slice(0, 10).split('-').reverse().join('-') : ''}
+                                                </CTableDataCell>
+                                                <CTableDataCell>₹{e.payment}</CTableDataCell>
+                                                <CTableDataCell>₹{e.remaining}</CTableDataCell>
+                                            </CTableRow>
+                                        ))}
+                                </CTableBody>
+                            </CTable>
+                        </div>
+                    ) : (
+                        <div className="text-center py-4 text-muted">
+                            <p className="mb-0">No payment history found for this invoice.</p>
+                        </div>
+                    )}
+                </CModalBody>
+            </CModal>
+
+
+            {/* Make-payment modal */}
+            <CModal visible={showPaymentModal} onClose={() => setShowPaymentModal(false)}>
+                <CModalHeader closeButton><CModalTitle>Make Payment</CModalTitle></CModalHeader>
+                <CModalBody>
+                    {selectedPayment && (
+                        <>
+                            <p><strong>Invoice:</strong> {selectedPayment.invoice_number}</p>
+                            <p><strong>Total:</strong> ₹{selectedPayment.total}</p>
+                            <p><strong>Remaining:</strong> ₹{selectedPayment.total - selectedPayment.paid_amount}</p>
+
+                            {selectedPayment.total - selectedPayment.paid_amount > 0 ? (
+                                <div className="mt-3">
+                                    <label className="form-label fw-semibold">Amount to Pay</label>
+                                    <input
+                                        type="number"
+                                        className="form-control"
+                                        value={payAmount}
+                                        onChange={e => setPayAmount(e.target.value)}
+                                        min="1"
+                                        max={selectedPayment.total - selectedPayment.paid_amount}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="alert alert-success text-center">
+                                    Payment Complete! No outstanding balance.
+                                </div>
+                            )}
+                        </>
+                    )}
+                </CModalBody>
+                <CModalFooter>
+                    <CButton color="secondary" onClick={() => setShowPaymentModal(false)}>Cancel</CButton>
+                    <CButton
+                        color="success"
+                        onClick={() => {
+                            if (!payAmount || Number(payAmount) <= 0) return showToast('danger', 'Enter a valid amount');
+                            const remaining = Number(selectedPayment.total) - Number(selectedPayment.paid_amount);
+                            if (Number(payAmount) > remaining) {
+                                return showToast('danger', 'Amount cannot be greater than remaining amount');
+                            }
+                            callPayment();
+                        }}
+                    >
+                        Confirm
+                    </CButton>
+                </CModalFooter>
+            </CModal>
+
+            {/* Order list modal */}
+            <CModal visible={showOrderModal} onClose={() => setShowOrderModal(false)} size="xl" backdrop="static">
+                <CModalHeader><CModalTitle>Invoice</CModalTitle></CModalHeader>
+                <CModalBody style={{ overflowY: 'visible', padding: 0 }}>
+                    <OrderList projectId={selectedProjectId} inModal={true} />
+                </CModalBody>
+
+            </CModal>
+        </>
+    );
+};
+
+export default ProjectPaymentReport;
