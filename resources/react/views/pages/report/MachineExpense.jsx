@@ -146,6 +146,19 @@ const MachineExpenses = () => {
       }, 0);
   };
 
+  const calculateMachineHours = (machineId, logs) => {
+    return logs
+      .filter(log => Number(log.machine_id) === Number(machineId))
+      .reduce((sum, log) => {
+        const start = parseFloat(log.start_reading);
+        const end = parseFloat(log.end_reading);
+       if (!isNaN(start) && !isNaN(end) && end > start ) {
+      return sum + (end - start);
+    }
+    return sum;
+      }, 0);
+  };
+
   const calculateMachineExpense = (machineId, expenses) => {
     return expenses
       .filter(expense => {
@@ -221,6 +234,7 @@ const MachineExpenses = () => {
       ...m,
       sr_no: idx + 1,
       profit: calculateMachineProfit(m.id, machineLogs),
+      totalHours: calculateMachineHours(m.id, machineLogs),
       expense: calculateMachineExpense(m.id, expenses1),
       net: calculateNet(m.id, machineLogs, expenses1),
     }));
@@ -264,6 +278,12 @@ const MachineExpenses = () => {
     );
   }, [filteredMachines]);
 
+  const totalWorkingHours = useMemo(() => {
+  return filteredMachines.reduce((sum, machine) => {
+    return sum + Number(machine.totalHours || 0);
+  }, 0);
+}, [filteredMachines]);
+
   // Export to Excel
   const exportToExcel = () => {
     const data = filteredMachines.map(m => ({
@@ -273,6 +293,7 @@ const MachineExpenses = () => {
       'Profit': m.profit,
       'Expense': m.expense,
       'Net': m.net,
+      'Hours': m.totalHours
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -408,9 +429,12 @@ const MachineExpenses = () => {
           </div>
         </div>
 
-        <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+        <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0',  display: 'flex', justifyContent:'space-between'}}>
           <span style={{ color: '#28a745' }}>
             Earning: {formatCurrency(machine.profit)}
+          </span>
+           <span style={{ color: 'blue' }}>
+            Hours: {(machine.totalHours)}
           </span>
         </div>
 
@@ -541,13 +565,15 @@ const MachineExpenses = () => {
               <CRow className="g-2 mb-3">
                 <CCol xs={6} md={3}>
                   <div className="rounded p-2 text-center bg-primary text-white shadow-sm">
-                    <small className="d-block">Machines</small>
-                    <strong className="fs-6">{summaryTotals.machineCount}</strong>
+                    <small className="d-block">Machines </small>
+                    <strong className="fs-6">{summaryTotals.machineCount} </strong>
+                    <small> ({totalWorkingHours}hrs.)</small>
+
                   </div>
                 </CCol>
                 <CCol xs={6} md={3}>
                   <div className="rounded p-2 text-center bg-success text-white shadow-sm">
-                    <small className="d-block">Total Earning</small>
+                    <small className="d-block">Total Earning </small>
                     <strong className="fs-6">{formatIndianNumber(summaryTotals.totalProfit)}</strong>
                   </div>
                 </CCol>
@@ -598,19 +624,22 @@ const MachineExpenses = () => {
                           Sr. No.
                         </CTableHeaderCell>
                         <CTableHeaderCell className="text-center" >
-                          Machine Name 
+                          Machine Name
                         </CTableHeaderCell>
                         <CTableHeaderCell className="text-center">
-                          Reg No 
+                          Reg No
                         </CTableHeaderCell>
                         <CTableHeaderCell className="text-center">
                           Earning
                         </CTableHeaderCell>
                         <CTableHeaderCell className="text-center">
-                          Expense 
+                          Hours
                         </CTableHeaderCell>
                         <CTableHeaderCell className="text-center">
-                          Net 
+                          Expense
+                        </CTableHeaderCell>
+                        <CTableHeaderCell className="text-center">
+                          Net
                         </CTableHeaderCell>
                         <CTableHeaderCell className="text-center">Actions</CTableHeaderCell>
                       </CTableRow>
@@ -632,51 +661,56 @@ const MachineExpenses = () => {
                       ) : (
                         <>
                           {filteredMachines.map((m) => (
-                           <CTableRow key={m.id}>
-  <CTableDataCell>{m.sr_no}</CTableDataCell>
-  <CTableDataCell>{m.machine_name || '-'}</CTableDataCell>
-  <CTableDataCell>{m.register_number || '-'}</CTableDataCell>
+                            <CTableRow key={m.id}>
+                              <CTableDataCell>{m.sr_no}</CTableDataCell>
+                              <CTableDataCell>{m.machine_name || '-'}</CTableDataCell>
+                              <CTableDataCell>{m.register_number || '-'}</CTableDataCell>
 
-  <CTableDataCell className="text-end">
-    <span style={{ color: '#28a745' }}>{formatIndianNumber(m.profit)}</span>
-  </CTableDataCell>
+                              <CTableDataCell className="text-end">
+                                <span style={{ color: '#28a745' }}>{formatIndianNumber(m.profit)}</span>
+                              </CTableDataCell>
 
-  <CTableDataCell className="text-end">
-    <span style={{ color: '#dc3545' }}>{formatIndianNumber(m.expense)}</span>
-  </CTableDataCell>
+                              <CTableDataCell className="text-end">
+                                <span className='text-primary'>{(m.totalHours)}</span>
+                              </CTableDataCell>
 
-  <CTableDataCell className="text-end">
-    <span
-      style={{
-        fontWeight: 500,
-        color: m.net >= 0 ? '#28a745' : '#dc3545',
-      }}
-    >
-      {formatIndianNumber(Math.abs(m.net))}
-    </span>
-  </CTableDataCell>
+                              <CTableDataCell className="text-end">
+                                <span style={{ color: '#dc3545' }}>{formatIndianNumber(m.expense)}</span>
+                              </CTableDataCell>
+                              
 
-  <CTableDataCell className="text-center">
-    <div className="d-flex justify-content-center gap-2">
-      <CBadge
-        color="success"
-        role="button"
-        style={{ cursor: 'pointer', fontSize: '0.75em', padding: '6px 8px' }}
-        onClick={() => handleProfits(m.id)}
-      >
-        View Earnings
-      </CBadge>
-      <CBadge
-        color="danger"
-        role="button"
-        style={{ cursor: 'pointer', fontSize: '0.75em', padding: '6px 8px' }}
-        onClick={() => handleLoss(m.id)}
-      >
-        View Expenses
-      </CBadge>
-    </div>
-  </CTableDataCell>
-</CTableRow>
+                              <CTableDataCell className="text-end">
+                                <span
+                                  style={{
+                                    fontWeight: 500,
+                                    color: m.net >= 0 ? '#28a745' : '#dc3545',
+                                  }}
+                                >
+                                  {formatIndianNumber(Math.abs(m.net))}
+                                </span>
+                              </CTableDataCell>
+
+                              <CTableDataCell className="text-center">
+                                <div className="d-flex justify-content-center gap-2">
+                                  <CBadge
+                                    color="success"
+                                    role="button"
+                                    style={{ cursor: 'pointer', fontSize: '0.75em', padding: '6px 8px' }}
+                                    onClick={() => handleProfits(m.id)}
+                                  >
+                                    View Earnings
+                                  </CBadge>
+                                  <CBadge
+                                    color="danger"
+                                    role="button"
+                                    style={{ cursor: 'pointer', fontSize: '0.75em', padding: '6px 8px' }}
+                                    onClick={() => handleLoss(m.id)}
+                                  >
+                                    View Expenses
+                                  </CBadge>
+                                </div>
+                              </CTableDataCell>
+                            </CTableRow>
 
                           ))}
                           {/* <CTableRow>

@@ -20,7 +20,8 @@ class Repayment extends Model
         'remaining',
         'from_advance',
         'is_advance',
-        'advance_taken'
+        'advance_taken',
+        'remark'
     ];
 
     protected $casts = [

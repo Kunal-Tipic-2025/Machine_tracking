@@ -22,6 +22,7 @@ class MachineLog extends Model
         'status',
         'mode_id',
         'price_per_hour',
-        'isPaid'
+        'isPaid',
+        'work_type_id'
     ];
 }

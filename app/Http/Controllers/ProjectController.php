@@ -269,7 +269,12 @@ class ProjectController extends Controller
     // Get all projects (Admin view)
     public function allProject()
     {
-        return Project::all();
+         $user = Auth::user();
+
+          $projects = Project::where('company_id', $user->company_id)
+                ->get();
+
+        return  $projects;
     }
 
     // Get projects for the logged-in user
@@ -376,6 +381,7 @@ class ProjectController extends Controller
             // 'operator_id.*' => 'numeric',              // Each element must be numeric
             'machine_id'    => 'sometimes|array',       // Accept array
             'machine_id.*'  => 'numeric',              // Each element must be numeric
+            '     '      => 'nullable|string|max:255',
         ]);
 
         $data['user_id'] = $user->id;

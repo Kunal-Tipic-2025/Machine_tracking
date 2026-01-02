@@ -31,6 +31,29 @@ const OrderList = ({ projectId, inModal = false }) => {
     const [filteredLogs, setFilteredLogs] = useState([]);
     const [downloadingInvoicePDF, setDownloadingInvoicePDF] = useState(false);
 
+
+    //Work type
+    const [workTypes, setWorkTypes] = useState([]);
+    useEffect(() => {
+        const fetchWorkTypes = async () => {
+            try {
+                const res = await getAPICall('/api/workingType');
+                setWorkTypes(res || []);
+            } catch (err) {
+                console.error('Error fetching work types', err);
+            }
+        };
+        fetchWorkTypes();
+    }, []);
+
+    const workTypeMap = React.useMemo(() => {
+        const map = {};
+        workTypes.forEach(wt => {
+            map[wt.id] = wt.type_of_work;
+        });
+        return map;
+    }, [workTypes]);
+
     const fetchMachineries = async () => {
         try {
             const response = await getAPICall('/api/machine-operators');
@@ -184,7 +207,8 @@ const OrderList = ({ projectId, inModal = false }) => {
                 prices,
                 formattedLogs, // filteredLogs
                 'english', // Default language
-                'save' // mode
+                'save', // mode
+                workTypeMap
             );
 
         } catch (error) {
@@ -376,11 +400,12 @@ const OrderList = ({ projectId, inModal = false }) => {
                                     <CTableHeaderCell>Sr no.</CTableHeaderCell>
                                     <CTableHeaderCell>Work Date</CTableHeaderCell>
                                     <CTableHeaderCell>Machine</CTableHeaderCell>
+                                    <CTableHeaderCell>Mode</CTableHeaderCell>
                                     <CTableHeaderCell>Operator</CTableHeaderCell>
+                                    <CTableHeaderCell>Work Type</CTableHeaderCell>
                                     <CTableHeaderCell>Start Reading</CTableHeaderCell>
                                     <CTableHeaderCell>End Reading</CTableHeaderCell>
                                     <CTableHeaderCell>Net Reading</CTableHeaderCell>
-                                    <CTableHeaderCell>Mode</CTableHeaderCell>
                                     <CTableHeaderCell>Price Per Hour</CTableHeaderCell>
                                     <CTableHeaderCell className="text-end">Total Price</CTableHeaderCell>
                                 </CTableRow>
@@ -392,11 +417,14 @@ const OrderList = ({ projectId, inModal = false }) => {
                                             <CTableDataCell>{index + 1}</CTableDataCell>
                                             <CTableDataCell>{log?.work_date || '-'}</CTableDataCell>
                                             <CTableDataCell>{rows.find((r) => String(r.id) === String(log?.machine_id))?.machine_name || 'N/A'}</CTableDataCell>
+                                            <CTableDataCell>{prices.find(p => p.id === Number(log.mode_id))?.mode || '-'}</CTableDataCell>
                                             <CTableDataCell>{operators.find(op => op.id === Number(log?.operator_id))?.name || 'Unknown Operator'}</CTableDataCell>
+                                            <CTableDataCell>
+                                                {workTypeMap[log?.work_type_id] || '—'}
+                                            </CTableDataCell>
                                             <CTableDataCell>{log?.start_reading || '-'}</CTableDataCell>
                                             <CTableDataCell>{log?.end_reading || '-'}</CTableDataCell>
                                             <CTableDataCell>{log?.end_reading && log?.start_reading ? (log.end_reading - log.start_reading) : '-'}</CTableDataCell>
-                                            <CTableDataCell>{prices.find(p => p.id === Number(log.mode_id))?.mode || '-'}</CTableDataCell>
                                             <CTableDataCell>₹{log?.price_per_hour || '0'}</CTableDataCell>
                                             <CTableDataCell className="text-end">
                                                 ₹{log?.end_reading && log?.start_reading && log?.price_per_hour
@@ -414,7 +442,7 @@ const OrderList = ({ projectId, inModal = false }) => {
                                 )}
                                 {/* Summary Rows */}
                                 <CTableRow className="fw-bold bg-light">
-                                    <CTableDataCell colSpan={9} className="text-end">
+                                    <CTableDataCell colSpan={10} className="text-end">
                                         Grand Total
                                     </CTableDataCell>
                                     <CTableDataCell className="text-end">
@@ -422,7 +450,7 @@ const OrderList = ({ projectId, inModal = false }) => {
                                     </CTableDataCell>
                                 </CTableRow>
                                 <CTableRow className="bg-light">
-                                    <CTableDataCell colSpan={9} className="text-end">
+                                    <CTableDataCell colSpan={10} className="text-end">
                                         Paid Amount
                                     </CTableDataCell>
                                     <CTableDataCell className="text-end text-success">
@@ -430,7 +458,7 @@ const OrderList = ({ projectId, inModal = false }) => {
                                     </CTableDataCell>
                                 </CTableRow>
                                 <CTableRow className="fw-bold bg-light">
-                                    <CTableDataCell colSpan={9} className="text-end">
+                                    <CTableDataCell colSpan={10} className="text-end">
                                         Remaining Amount
                                     </CTableDataCell>
                                     <CTableDataCell className={`text-end ${remaining > 0 ? 'text-danger' : 'text-success'}`}>
@@ -443,21 +471,21 @@ const OrderList = ({ projectId, inModal = false }) => {
 
                     {/* Payment Summary Card */}
                     <div className="mt-4 p-3 bg-light rounded">
-                        <CRow>
+                        <CRow className="w-100">
                             <CCol md={4}>
-                                <div className="d-flex align-items-center mb-2">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-bold me-2">Total Amount:</span>
                                     <span className="fs-5 fw-bold">₹{Number(orders?.total || 0).toFixed(2)}</span>
                                 </div>
                             </CCol>
                             <CCol md={4}>
-                                <div className="d-flex align-items-center mb-2">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-bold me-2">Paid Amount:</span>
                                     <span className="fs-5 fw-bold text-success">₹{Number(orders?.paid_amount || 0).toFixed(2)}</span>
                                 </div>
                             </CCol>
                             <CCol md={4}>
-                                <div className="d-flex align-items-center mb-2">
+                                  <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-bold me-2">Remaining:</span>
                                     <span className={`fs-5 fw-bold ${remaining > 0 ? 'text-danger' : 'text-success'}`}>
                                         ₹{remaining.toFixed(2)}

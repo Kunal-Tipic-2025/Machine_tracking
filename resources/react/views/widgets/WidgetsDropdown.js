@@ -123,6 +123,41 @@ const WidgetsDropdown = (props) => {
     <>
       {(user === 0 || user === 1) && (
         <CRow className={props.className} xs={{ gutter: 4 }}>
+
+          <CCol sm={4} xl={4} xxl={4}>
+            <CWidgetStatsA className='pb-3'
+                  style={{ backgroundColor: '#e5ed05' }} 
+              value={
+                <>
+                  <span className='fs-4'style={{color: 'black'}}>
+                    {formatCurrency(reportMonth.currentSales)}
+                  </span>
+                  <span className="fs-6 fw-normal" style={{color: 'black'}}>
+                    &nbsp;{t('LABELS.in')} {reportMonth.currentMonth}
+                  </span>
+                </>
+              }
+                title= {<span style={{ color: 'black' }}>{t('LABELS.sales')} <strong>({props.totalWorkingReading} hrs.)</strong></span>}
+              />
+          </CCol>
+
+          <CCol sm={4} xl={4} xxl={4}>
+            <CWidgetStatsA className='pb-3'
+              style={{ backgroundColor: '#f73434' }} 
+              value={
+                <>
+                  <span className='fs-4' style={{color:'white'}}>
+                    {formatCurrency(reportMonth.currentExpense)}
+                  </span>
+                  <span className="fs-6 fw-normal" style={{color:'white'}}>
+                    &nbsp;{t('LABELS.in')} {reportMonth.currentMonth}
+                  </span>
+                </>
+              }
+              title= {<span style={{ color: 'white' }}>{t('LABELS.expenses')}</span>}
+            />
+          </CCol>
+
           <CCol sm={4} xl={4} xxl={4} className='vh-[40%]'>
             <CWidgetStatsA className='pb-3'
             color={getPandLColor(reportMonth.currentPandL)}
@@ -140,40 +175,7 @@ const WidgetsDropdown = (props) => {
               title= {<span style={{ color: 'white' }}>{t('LABELS.profit_loss')}</span>}
               />
           </CCol>
-        
-          <CCol sm={4} xl={4} xxl={4}>
-            <CWidgetStatsA className='pb-3'
-                  style={{ backgroundColor: '#e5ed05' }} 
-              value={
-                <>
-                  <span className='fs-4'style={{color: 'black'}}>
-                    {formatCurrency(reportMonth.currentSales)}
-                  </span>
-                  <span className="fs-6 fw-normal" style={{color: 'black'}}>
-                    &nbsp;{t('LABELS.in')} {reportMonth.currentMonth}
-                  </span>
-                </>
-              }
-                title= {<span style={{ color: 'black' }}>{t('LABELS.sales')}</span>}
-              />
-          </CCol>
-        
-            <CCol sm={4} xl={4} xxl={4}>
-            <CWidgetStatsA className='pb-3'
-              style={{ backgroundColor: '#f73434' }} 
-              value={
-                <>
-                  <span className='fs-4' style={{color:'white'}}>
-                    {formatCurrency(reportMonth.currentExpense)}
-                  </span>
-                  <span className="fs-6 fw-normal" style={{color:'white'}}>
-                    &nbsp;{t('LABELS.in')} {reportMonth.currentMonth}
-                  </span>
-                </>
-              }
-              title= {<span style={{ color: 'white' }}>{t('LABELS.expenses')}</span>}
-            />
-          </CCol>
+          
      </CRow>
       )}
     </>

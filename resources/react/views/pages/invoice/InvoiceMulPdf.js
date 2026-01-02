@@ -1696,6 +1696,7 @@ const InvoiceTemplate = ({
   prices = [],
   filteredLogs = [],
   totalInWords = 'N/A',
+  workTypeMap = {},
 }) => {
   console.log("logs");
   console.log(logs);
@@ -1806,12 +1807,13 @@ const InvoiceTemplate = ({
                     <th style={{ width: '40px', border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Sr No</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Work Date</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Machine</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Mode</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Operator</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Work Type</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Start Reading</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>End Reading</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Net Reading</th>
-                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Mode</th>
-                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Price / Hour</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Price per reading</th>
                     <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Total Price</th>
                   </tr>
                 </thead>
@@ -1834,9 +1836,15 @@ const InvoiceTemplate = ({
                           {getMachineName(log.data?.machine_id) || 'N/A'}
                         </td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {prices.find((op) => op.id === log.data?.mode_id)?.mode || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
                           {operators.find(
                             (op) => String(op.id) === String(log.data?.operator_id)
                           )?.name || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {workTypeMap[log.data?.work_type_id] || 'N/A'}
                         </td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
                           {formatNumber(Number(log.data?.start_reading) || 0)}
@@ -1846,9 +1854,6 @@ const InvoiceTemplate = ({
                         </td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
                           {formatNumber(netReading)}
-                        </td>
-                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                          {prices.find((op) => op.id === log.data?.mode_id)?.mode || 'N/A'}
                         </td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
                           {formatNumber(Number(log.data?.price_per_hour) || 0)}
@@ -1884,13 +1889,12 @@ const InvoiceTemplate = ({
                           borderTop: '2px solid #3075d2', // Updated border color
                         }}
                       >
-                        <td colSpan="6" style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
+                        <td colSpan="8" style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
                           Grand Total:
                         </td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
                           {formatNumber(totalNetReading)}
                         </td>
-                        <td style={{ border: '1px solid #3075d2', padding: '6px' }}></td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px' }}></td>
                         <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
                           ₹{formatNumber(grandTotal)}
@@ -2012,7 +2016,8 @@ export function generateMultiLanguagePDF(
   prices,
   filteredLogs,
   language = 'english',
-  mode = 'blob'
+  mode = 'blob',
+  workTypeMap = {}
 ) {
   const ci = getUserData()?.company_info;
 
@@ -2076,6 +2081,7 @@ export function generateMultiLanguagePDF(
         rows={rows}
         prices={prices}
         filteredLogs={pageLogs}
+        workTypeMap={workTypeMap}
       />
     );
 

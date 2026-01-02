@@ -71,23 +71,23 @@ const MainChart = (props) => {
   return (
     <>
       {/* Summary Cards */}
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'flex-start',
         marginBottom: '20px',
         flexWrap: 'wrap',
         gap: '15px'
       }}>
-        <div style={{ 
+        <div style={{
           flex: '1 1 250px',
           minWidth: '200px'
         }}>
-          
+
         </div>
-        
-        <div style={{ 
-          display: 'flex', 
+
+        <div style={{
+          display: 'flex',
           gap: 'clamp(8px, 2vw, 20px)',
           flexWrap: 'wrap',
           alignItems: 'center',
@@ -95,9 +95,9 @@ const MainChart = (props) => {
           flex: '1 1 300px',
           width: '100%'
         }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: '8px',
             padding: 'clamp(6px, 1.5vw, 8px) clamp(8px, 2vw, 12px)',
             backgroundColor: getStyle('--cui-body-bg'),
@@ -105,15 +105,15 @@ const MainChart = (props) => {
             border: `1px solid ${getStyle('--cui-border-color')}`,
             minWidth: 'fit-content'
           }}>
-            <div style={{ 
-              width: 'clamp(10px, 1.5vw, 12px)', 
-              height: 'clamp(10px, 1.5vw, 12px)', 
+            <div style={{
+              width: 'clamp(10px, 1.5vw, 12px)',
+              height: 'clamp(10px, 1.5vw, 12px)',
               backgroundColor: '#4A90E2',
               borderRadius: '2px',
               flexShrink: 0
             }}></div>
-            <span style={{ 
-              fontSize: 'clamp(11px, 1.8vw, 13px)', 
+            <span style={{
+              fontSize: 'clamp(11px, 1.8vw, 13px)',
               fontWeight: '500',
               color: getStyle('--cui-body-color'),
               whiteSpace: 'nowrap'
@@ -121,10 +121,10 @@ const MainChart = (props) => {
               Profit & Loss
             </span>
           </div>
-          
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: '8px',
             padding: 'clamp(6px, 1.5vw, 8px) clamp(8px, 2vw, 12px)',
             backgroundColor: getStyle('--cui-body-bg'),
@@ -132,26 +132,26 @@ const MainChart = (props) => {
             border: `1px solid ${getStyle('--cui-border-color')}`,
             minWidth: 'fit-content'
           }}>
-            <div style={{ 
-              width: 'clamp(10px, 1.5vw, 12px)', 
-              height: 'clamp(10px, 1.5vw, 12px)', 
+            <div style={{
+              width: 'clamp(10px, 1.5vw, 12px)',
+              height: 'clamp(10px, 1.5vw, 12px)',
               backgroundColor: '#2ECC71',
               borderRadius: '2px',
               flexShrink: 0
             }}></div>
-            <span style={{ 
-              fontSize: 'clamp(11px, 1.8vw, 13px)', 
+            <span style={{
+              fontSize: 'clamp(11px, 1.8vw, 13px)',
               fontWeight: '500',
               color: getStyle('--cui-body-color'),
               whiteSpace: 'nowrap'
             }}>
-              Work Done Amount
+              Work Done Amount 
             </span>
           </div>
-          
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: '8px',
             padding: 'clamp(6px, 1.5vw, 8px) clamp(8px, 2vw, 12px)',
             backgroundColor: getStyle('--cui-body-bg'),
@@ -159,15 +159,15 @@ const MainChart = (props) => {
             border: `1px solid ${getStyle('--cui-border-color')}`,
             minWidth: 'fit-content'
           }}>
-            <div style={{ 
-              width: 'clamp(10px, 1.5vw, 12px)', 
-              height: 'clamp(10px, 1.5vw, 12px)', 
+            <div style={{
+              width: 'clamp(10px, 1.5vw, 12px)',
+              height: 'clamp(10px, 1.5vw, 12px)',
               backgroundColor: '#E74C3C',
               borderRadius: '2px',
               flexShrink: 0
             }}></div>
-            <span style={{ 
-              fontSize: 'clamp(11px, 1.8vw, 13px)', 
+            <span style={{
+              fontSize: 'clamp(11px, 1.8vw, 13px)',
               fontWeight: '500',
               color: getStyle('--cui-body-color'),
               whiteSpace: 'nowrap'
@@ -178,14 +178,14 @@ const MainChart = (props) => {
         </div>
       </div>
 
-      <div style={{ 
+      <div style={{
         width: '100%',
         overflow: 'hidden'
       }}>
         <CChartBar
           ref={chartRef}
-          style={{ 
-            height: 'clamp(250px, 40vh, 400px)', 
+          style={{
+            height: 'clamp(250px, 40vh, 400px)',
             marginTop: 'clamp(20px, 3vw, 40px)',
             width: '100%'
           }}
@@ -277,7 +277,7 @@ const MainChart = (props) => {
                   font: {
                     size: window.innerWidth < 768 ? 10 : 12,
                   },
-                  callback: function(value) {
+                  callback: function (value) {
                     return roundToTwo(value) + 'k';
                   }
                 },
@@ -301,7 +301,7 @@ const MainChart = (props) => {
               },
             },
             animation: {
-              onComplete: function(chart) {
+              onComplete: function (chart) {
                 // Ensure no data labels are drawn after animation
                 if (chart && chart.config && chart.config.options && chart.config.options.plugins) {
                   chart.config.options.plugins.datalabels = { display: false };

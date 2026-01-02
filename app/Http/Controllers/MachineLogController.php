@@ -461,6 +461,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use App\Models\MachineLog;
 use App\Models\MachinePrice;
+use Illuminate\Support\Facades\DB;
 
 class MachineLogController extends Controller
 {
@@ -486,6 +487,7 @@ class MachineLogController extends Controller
             'mode_id' => 'required|integer|exists:machine_prices,id',
             'machine_start' => 'required|string',
             'machine_start_pic' => 'nullable|string',
+            'work_type_id' => 'required|integer',
         ]);
 
         $machinePrice = MachinePrice::find($validated['mode_id']);
@@ -506,6 +508,7 @@ class MachineLogController extends Controller
             'start_reading'  => $validated['machine_start'] ?? null,
             'start_photo'    => $validated['machine_start_pic'] ?? null,
             'isPaid'         => 0, // 👈 default unpaid
+            'work_type_id'   => $validated['work_type_id'],
         ]);
 
         return response()->json([
@@ -664,6 +667,72 @@ public function index1(Request $request)
     }
  
     return response()->json($query->get());
+}
+
+
+//
+public function getMachineWiseBreakdown(Request $request)
+{
+   $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        if (!$user->company_id) {
+            return response()->json(['message' => 'Company ID missing for this user'], 422);
+        }
+
+        // $userId = $user->id;
+
+    $companyId = $user->company_id;
+
+    $data = MachineLog::where('company_id', $companyId)
+        ->whereNotNull('start_reading')
+        ->whereNotNull('end_reading')
+        ->select(
+            'machine_id',
+            DB::raw('SUM(end_reading - start_reading) as total_hours')
+        )
+        ->groupBy('machine_id')
+        ->get();
+
+    return response()->json([
+        'company_id' => $companyId,
+        'machine_wise_hours' => $data
+    ], 200);
+}
+
+//get total hours as per project
+public function getprojectWiseBreakdown(Request $request)
+{
+   $user = auth()->user();
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        if (!$user->company_id) {
+            return response()->json(['message' => 'Company ID missing for this user'], 422);
+        }
+
+        // $userId = $user->id;
+
+    $companyId = $user->company_id;
+
+    $data = MachineLog::where('company_id', $companyId)
+        ->whereNotNull('start_reading')
+        ->whereNotNull('end_reading')
+        ->whereRaw('CAST(end_reading AS DECIMAL(10,2)) > CAST(start_reading AS DECIMAL(10,2))')
+        ->select(
+            'project_id',
+            DB::raw('SUM(end_reading - start_reading) as total_hours')
+        )
+        ->groupBy('project_id')
+        ->get();
+
+    return response()->json([
+        'company_id' => $companyId,
+        'project_wise_hours' => $data
+    ], 200);
 }
 
 }

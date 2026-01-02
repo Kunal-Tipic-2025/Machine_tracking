@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import './Invoice.css'
 import {
   CAlert,
@@ -65,6 +65,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
   const [fixedBidTransactionId, setFixedBidTransactionId] = useState('')
   const [fixedBidRemark, setFixedBidRemark] = useState('')
 
+  const [workTypes, setWorkTypes] = useState([]);
 
   const [form, setForm] = useState({
     projectId: null,
@@ -107,6 +108,29 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
     const discount = parseFloat(form.discount) || 0
     return Math.max(0, projectCost - discount)
   }
+
+  //fetch working type
+  useEffect(() => {
+    const fetchWorkTypes = async () => {
+      try {
+        const res = await getAPICall('/api/workingType');
+        setWorkTypes(res || []);
+      } catch (err) {
+        console.error('Error fetching work types', err);
+      }
+    };
+
+    fetchWorkTypes();
+  }, []);
+
+  const workTypeMap = useMemo(() => {
+    const map = {};
+    workTypes.forEach(wt => {
+      map[wt.id] = wt.type_of_work;
+    });
+    return map;
+  }, [workTypes]);
+
 
   const fetchProjects = useCallback(async (query = '') => {
     setProjectsLoading(true)
@@ -973,6 +997,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                           <th style={{ width: '100px', minWidth: '90px' }} className="text-center align-middle">
                             Operator
                           </th>
+                          <th style={{ width: '100px', minWidth: '90px' }} className="text-center align-middle">Work Type</th>
                           <th style={{ width: '80px' }} className="text-center align-middle">Start</th>
                           <th style={{ width: '80px' }} className="text-center align-middle">End</th>
                           <th style={{ width: '80px' }} className="text-center align-middle">Net</th>
@@ -1022,6 +1047,10 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                               >
                                 {operatorDisplay.name}
                               </td>
+                              <td>
+                                {workTypeMap[l.work_type_id] || '-'}
+                              </td>
+
                               <td className="text-center">{start}</td>
                               <td className="text-center">{end}</td>
                               <td className="text-center">{total}</td>

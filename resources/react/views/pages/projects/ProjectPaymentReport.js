@@ -56,6 +56,7 @@ const ProjectPaymentReport = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState(null);
     const [payAmount, setPayAmount] = useState('');
+    const [remark, setRemark] = useState('');
     // Advance-payment modal
     const [showAdvanceModal, setShowAdvanceModal] = useState(false);
     const [advanceCustomer, setAdvanceCustomer] = useState('');
@@ -66,6 +67,10 @@ const ProjectPaymentReport = () => {
     const [showAdvanceInvoiceModal, setShowAdvanceInvoiceModal] = useState(false);
     const [additionalAmount, setAdditionalAmount] = useState('');
     const [useAdvance, setUseAdvance] = useState(false);
+
+    const [hours, setHours] = useState('');
+    const [projects, setProjects] = useState([]);
+    const [projectWiseHours, setProjectWiseHours] = useState([]);
 
 
     // -------------------------------------------------
@@ -78,6 +83,19 @@ const ProjectPaymentReport = () => {
             setPayments(Array.isArray(resp) ? resp : []);
         } catch (err) {
             showToast('danger', 'Error fetching project payments: ' + (err?.message || err));
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchMachineHours = async () => {
+        setIsLoading(true);
+        try {
+            const resp = await getAPICall(`/api/project-wise-hours`);
+            setProjectWiseHours(resp.project_wise_hours || []);
+            console.log('machine hourse', resp.project_wise_hours);
+        } catch (err) {
+            showToast('danger', 'Error fetching Hours: ' + (err?.message || err));
         } finally {
             setIsLoading(false);
         }
@@ -132,6 +150,7 @@ const ProjectPaymentReport = () => {
     useEffect(() => {
         fetchPayments();
         fetchAllCustomers();
+        fetchMachineHours()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [companyId]);
 
@@ -156,6 +175,40 @@ const ProjectPaymentReport = () => {
     const companyPayments = useMemo(() => {
         return payments.filter(p => p.company_id === companyId);
     }, [payments, companyId]);
+
+
+    //memoised project wise data
+    const projectHoursMap = useMemo(() => {
+        const map = {};
+        projectWiseHours.forEach(item => {
+            map[Number(item.project_id)] = Number(item.total_hours || 0);
+        });
+        return map;
+    }, [projectWiseHours]);
+
+    const totalWorkingHours = useMemo(() => {
+        return projectWiseHours.reduce((sum, item) => {
+            return sum + Number(item.total_hours || 0);
+        }, 0);
+    }, [projectWiseHours]);
+
+    const getCustomerHours = (records) => {
+        // records = all payment records of ONE customer
+
+        // 1️⃣ Extract unique project IDs
+        const projectIds = [
+            ...new Set(
+                records
+                    .map(r => r.project?.id)
+                    .filter(Boolean)
+            )
+        ];
+
+        // 2️⃣ Sum hours for those projects
+        return projectIds.reduce((sum, pid) => {
+            return sum + (projectHoursMap[pid] || 0);
+        }, 0);
+    };
 
     const groupedCustomers = useMemo(() => {
         const groups = {};
@@ -215,13 +268,14 @@ const ProjectPaymentReport = () => {
         const amountToPay = Number(payAmount);
         const newPaid = Number(selectedPayment.paid_amount) + amountToPay;
         const remaining = Number(selectedPayment.total) - newPaid;
-
+        const remarkRepayment = remark;
         try {
             // 1. Update project-payment record — preserve payment_mode
             const updatePayload = {
                 paid_amount: newPaid,
                 // Explicitly preserve existing payment_mode
                 payment_mode: selectedPayment.payment_mode || null,
+
             };
 
             const resp = await fetch(`/api/project-payments/${selectedPayment.id}/status`, {
@@ -253,6 +307,7 @@ const ProjectPaymentReport = () => {
             remaining: remaining,
             is_completed: remaining <= 0,
             date: today,
+            remark: remarkRepayment,
         };
 
         try {
@@ -264,6 +319,7 @@ const ProjectPaymentReport = () => {
 
             // Reset and refresh
             setPayAmount('');
+            setRemark('');
             setShowPaymentModal(false);
             fetchPayments();
             if (projectId) fetchHistory();
@@ -272,6 +328,15 @@ const ProjectPaymentReport = () => {
             showToast('danger', 'Payment recorded but history failed to save.');
         }
     };
+
+    const getCustomerTotalHours = (customerProjects) => {
+        return customerProjects.reduce((sum, proj) => {
+            return sum + (projectHoursMap[proj.id] || 0);
+        }, 0);
+    };
+
+
+
 
     // -------------------------------------------------
     // 9. Customer list view
@@ -336,7 +401,7 @@ const ProjectPaymentReport = () => {
                                     </CCol>
                                     <CCol xs={6} md={3}>
                                         <div className="rounded p-2 text-center bg-success text-white shadow-sm">
-                                            <small className="d-block">Total Billed</small>
+                                            <small className="d-block">Total Billed ({totalWorkingHours}hrs.)</small>
                                             <strong className="fs-6">{formatCurrency(summaryStats.totalBilled)}</strong>
                                         </div>
                                     </CCol>
@@ -361,6 +426,7 @@ const ProjectPaymentReport = () => {
                                             <CTableRow>
                                                 <CTableHeaderCell className="text-center align-middle">Sr. No.</CTableHeaderCell>
                                                 <CTableHeaderCell className="text-center align-middle">Customer Name</CTableHeaderCell>
+                                                <CTableHeaderCell className="text-center align-middle">Hours</CTableHeaderCell>
                                                 <CTableHeaderCell className="text-center align-middle">Total</CTableHeaderCell>
                                                 <CTableHeaderCell className="text-center align-middle">Paid</CTableHeaderCell>
                                                 <CTableHeaderCell className="text-center align-middle">Remaining</CTableHeaderCell>
@@ -374,10 +440,14 @@ const ProjectPaymentReport = () => {
                                                 const total = nonAdvancePayments.reduce((s, p) => s + Number(p.total || 0), 0);
                                                 const paid = nonAdvancePayments.reduce((s, p) => s + Number(p.paid_amount || 0), 0);
                                                 const rem = total - paid;
+                                                const totalHours = getCustomerHours(recs);
+
                                                 return (
                                                     <CTableRow key={cust}>
                                                         <CTableDataCell>{idx + 1}</CTableDataCell>
                                                         <CTableDataCell>{cust}</CTableDataCell>
+                                                        <CTableDataCell style={{ color: totalHours < 0 ? 'red' : 'blue', fontWeight: 600 }}>
+                                                            {totalHours}</CTableDataCell>
                                                         <CTableDataCell className="text-end">₹{total.toFixed(2)}</CTableDataCell>
                                                         <CTableDataCell className="text-success fw-bold text-end">₹{paid.toFixed(2)}</CTableDataCell>
                                                         <CTableDataCell className="text-danger fw-bold text-end">₹{rem.toFixed(2)}</CTableDataCell>
@@ -924,9 +994,9 @@ const ProjectPaymentReport = () => {
                 <CModalHeader>
                     <div className="d-flex justify-content-between align-items-center w-100">
                         <CModalTitle>Payment History</CModalTitle>
-                        <CButton 
-                            color="success" 
-                            size="sm" 
+                        <CButton
+                            color="success"
+                            size="sm"
                             className="me-4"
                             onClick={handleDownloadHistoryPDF}
                             title="Download History PDF"
@@ -945,6 +1015,7 @@ const ProjectPaymentReport = () => {
                                         <CTableHeaderCell>Date</CTableHeaderCell>
                                         <CTableHeaderCell>Paid</CTableHeaderCell>
                                         <CTableHeaderCell>Remaining</CTableHeaderCell>
+                                        <CTableHeaderCell>Remark</CTableHeaderCell>
                                     </CTableRow>
                                 </CTableHead>
                                 <CTableBody>
@@ -957,6 +1028,7 @@ const ProjectPaymentReport = () => {
                                                 </CTableDataCell>
                                                 <CTableDataCell>₹{e.payment}</CTableDataCell>
                                                 <CTableDataCell>₹{e.remaining}</CTableDataCell>
+                                                <CTableDataCell>{e.remark}</CTableDataCell>
                                             </CTableRow>
                                         ))}
                                 </CTableBody>
@@ -992,7 +1064,16 @@ const ProjectPaymentReport = () => {
                                         min="1"
                                         max={selectedPayment.total - selectedPayment.paid_amount}
                                     />
+
+                                    <label className="form-label fw-semibold">Remark</label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={remark}
+                                        onChange={e => setRemark(e.target.value)}
+                                    />
                                 </div>
+
                             ) : (
                                 <div className="alert alert-success text-center">
                                     Payment Complete! No outstanding balance.

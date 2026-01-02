@@ -304,7 +304,7 @@ Route::delete('/partners/{id}', [OnboardingPartnerController::class, 'destroy'])
 
 
 use App\Http\Controllers\PartnerDashboardController;
-
+use App\Http\Controllers\WorkingTypeController;
 
 // Public routes for partner authentication
 Route::prefix('partners')->group(function () {
@@ -519,6 +519,12 @@ Route::delete('/company-receipts/{id}', [CompanyReceiptController::class, 'destr
 
       // Onboarding Partner Type
 
+//Kunal
+Route::get('/machine-wise-hours', [MachineLogController::class, 'getMachineWiseBreakdown']);
+Route::get('/project-wise-hours', [MachineLogController::class, 'getprojectWiseBreakdown']);
+Route::get('/workingType', [WorkingTypeController::class, 'index']);
+Route::post('/saveWorkingType', [WorkingTypeController::class, 'store']);
+
 
 });
 
@@ -572,6 +578,7 @@ Route::middleware('auth.apikey')->group(function () {
     // ===== RESOURCE ROUTES LAST =====
     Route::resource('company', CompanyInfoController::class);
     Route::resource('plan', PlanController::class);
+
     
 });
 
@@ -629,4 +636,8 @@ Route::get('/machineries1', [MachineOperatorController::class, 'index']);
 Route::get('/machine-expense-report', [ExpenseController::class, 'machineExpenseReport'])->name('expense.machine-report');
 Route::get('/expense1', [ExpenseController::class, 'index1'])->name('expense.index1');
 Route::get('/machines', [MachineryController::class, 'index'])->name('machines.index');
+
+
+//Kunal
+
 });

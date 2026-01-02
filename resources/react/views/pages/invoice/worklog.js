@@ -18,6 +18,8 @@ const getTodayDate = () => {
   return today.toISOString().split('T')[0];
 };
 
+
+
 const getDefaultFormData = () => ({
   project_id: '',
   project_name: '',
@@ -33,7 +35,8 @@ const getDefaultFormData = () => ({
     actual_machine_hr: 0,
     price_per_hour: 0,
     machine_start_pic: null,
-    machine_end_pic: null
+    machine_end_pic: null,
+    work_type_id: '',
   }],
 });
 const MachineUsageForm = () => {
@@ -59,7 +62,8 @@ const MachineUsageForm = () => {
         actual_machine_hr: 0,
         price_per_hour: 0,
         machine_start_pic: null,
-        machine_end_pic: null
+        machine_end_pic: null,
+        work_type_id: ''
       }],
     };
   });
@@ -105,6 +109,23 @@ const MachineUsageForm = () => {
   const [newProjectMachines, setNewProjectMachines] = useState([]);
   const [newProjectOperatorMachines, setNewProjectOperatorMachines] = useState({});
   const [cameraError, setCameraError] = useState(false);
+  const [workTypes, setWorkTypes] = useState([]);
+  useEffect(() => {
+    const fetchWorkTypes = async () => {
+      try {
+        const res = await getAPICall('/api/workingType');
+        const options = (res || []).map(w => ({
+          value: w.id,
+          label: w.type_of_work,
+        }));
+        setWorkTypes(options);
+      } catch (err) {
+        console.error('Error fetching work types', err);
+      }
+    };
+
+    fetchWorkTypes();
+  }, []);
 
 
   const [cameraFacingMode, setCameraFacingMode] = useState('environment');
@@ -125,7 +146,8 @@ const MachineUsageForm = () => {
         actual_machine_hr: 0,
         price_per_hour: 0,
         machine_start_pic: null,
-        machine_end_pic: null
+        machine_end_pic: null,
+        work_type_id: ''
       }],
     });
     setSearchQuery('');
@@ -211,6 +233,52 @@ const MachineUsageForm = () => {
   const filteredOperatorOptions = operators.filter((op) =>
     selectedOperators.includes(op.value)
   );
+
+
+  //Add new work type
+  const [showWorkTypeModal, setShowWorkTypeModal] = useState(false);
+  const [newWorkTypeName, setNewWorkTypeName] = useState('');
+  const [addingWorkTypeForIndex, setAddingWorkTypeForIndex] = useState(null);
+  const handleSaveWorkType = async () => {
+    if (!newWorkTypeName.trim()) {
+      showToast('danger', 'Please enter work type name');
+      return;
+    }
+
+    try {
+      const res = await post('/api/saveWorkingType', {
+        type_of_work: newWorkTypeName.trim(),
+      });
+
+      showToast('success', 'Work type added successfully');
+
+      // Add new option to dropdown
+      const newOption = {
+        value: res.data.id,
+        label: res.data.type_of_work,
+      };
+
+      setWorkTypes(prev => [...prev, newOption]);
+
+      // Auto-select for the correct row
+      if (addingWorkTypeForIndex !== null) {
+        handleMachineReadingChange(
+          addingWorkTypeForIndex,
+          'work_type_id',
+          newOption.value
+        );
+      }
+
+      // Reset modal
+      setNewWorkTypeName('');
+      setAddingWorkTypeForIndex(null);
+      setShowWorkTypeModal(false);
+
+    } catch (err) {
+      console.error(err);
+      showToast('danger', 'Failed to add work type');
+    }
+  };
 
   const fetchProjects = useCallback(async (query) => {
     try {
@@ -549,6 +617,7 @@ const MachineUsageForm = () => {
           machine_id: r.machine_id,
           operator_id: r.operator_id,
           mode_id: r.mode_id,
+          work_type_id: r.work_type_id,
           machine_start: r.machine_start,
           date: formData.date,
           machine_start_pic: r.machine_start_pic,
@@ -585,6 +654,7 @@ const MachineUsageForm = () => {
         r.operator_id &&
         r.machine_id &&
         r.mode_id &&
+        r.work_type_id &&
         r.machine_start;
 
       const hasPhoto = userType === 2 ? !!r.machine_start_pic : true;
@@ -760,6 +830,43 @@ const MachineUsageForm = () => {
 
   return (
     <div className="">
+
+      {/* work type model  */}
+      <CModal
+        visible={showWorkTypeModal}
+        onClose={() => setShowWorkTypeModal(false)}
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle>Add New Work Type</CModalTitle>
+        </CModalHeader>
+
+        <CModalBody>
+          <CFormLabel>Work Type Name</CFormLabel>
+          <CFormInput
+            type="text"
+            placeholder="e.g. Excavation, Heavy Lifting"
+            value={newWorkTypeName}
+            onChange={(e) => setNewWorkTypeName(e.target.value)}
+          />
+        </CModalBody>
+
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={() => setShowWorkTypeModal(false)}
+          >
+            Cancel
+          </CButton>
+          <CButton
+            color="primary"
+            onClick={handleSaveWorkType}
+          >
+            Save
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
       <div fluid>
         {showSuccess && (
           <CAlert color="success" dismissible onClose={() => setShowSuccess(false)}>
@@ -1008,9 +1115,57 @@ const MachineUsageForm = () => {
                                   handleMachineReadingChange(index, 'price_per_hour', selected ? selected.price_per_hour : 0);
                                 }}
                               />
-
-
                             </CCol>
+
+                            {/* <CCol xs={12} md={2} className="p-1">
+                              <CFormLabel>Work Type <span style={{ color: 'red' }}>*</span></CFormLabel>
+                              <Select
+                                options={workTypes}
+                                isSearchable
+                                placeholder="Select Type"
+                                value={workTypes.find(w => w.value === reading.work_type_id) || null}
+                                onChange={(selected) => {
+                                  handleMachineReadingChange(
+                                    index,
+                                    'work_type_id',
+                                    selected ? selected.value : ''
+                                  );
+                                }}
+                              />
+                            </CCol> */}
+
+                            <CCol xs={12} md={2} className="p-1">
+                              <CFormLabel className="d-flex justify-content-between align-items-center">
+                                <span>Work Type <span style={{ color: 'red' }}>*</span></span>
+                                <CButton
+                                  size="sm"
+                                  color="primary"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setAddingWorkTypeForIndex(index);
+                                    setShowWorkTypeModal(true);
+                                  }}
+                                >
+                                  + Add
+                                </CButton>
+                              </CFormLabel>
+
+                              <Select
+                                options={workTypes}
+                                isSearchable
+                                placeholder="Select Type"
+                                value={workTypes.find(w => w.value === reading.work_type_id) || null}
+                                onChange={(selected) => {
+                                  handleMachineReadingChange(
+                                    index,
+                                    'work_type_id',
+                                    selected ? selected.value : ''
+                                  );
+                                }}
+                              />
+                            </CCol>
+
+
                             <CCol xs={12} md={2} className="p-1">
                               <CFormLabel>Start Reading</CFormLabel>
                               <CFormInput

@@ -521,6 +521,7 @@ const ProjectForm = () => {
     remark: "",
     gst_number: "",
     operator_id: [""],
+    // typeOfWork:""
   });
 
   const [errors, setErrors] = useState({});
@@ -620,6 +621,12 @@ const ProjectForm = () => {
       return;
     }
 
+    //  if (!formData.typeOfWork || formData.typeOfWork.trim() === "") {
+    //   setErrors({ typeOfWork: "Type of work is required." });
+    //   setLoading(false);
+    //   return;
+    // }
+
     try {
       // Prepare payload with empty machine_id if none assigned
       const machineIds = [];
@@ -700,6 +707,7 @@ const ProjectForm = () => {
                   }}
                   required
                   maxLength={10}
+                  minLength={10}
                   placeholder="Enter Customer Mobile..."
                 />
               </CCol>
@@ -743,6 +751,20 @@ const ProjectForm = () => {
                   feedback={errors.work_place}
                 />
               </CCol>
+
+                {/* Type of Work  */}
+                {/* <CCol md={4}>
+                <CFormLabel>Type Of Work</CFormLabel>
+                <CFormInput
+                  type="text"
+                  name="typeOfWork"
+                  value={formData.typeOfWork}
+                  onChange={handleChange}
+                  placeholder="Enter Type of Work "
+                  invalid={!!errors.typeOfWork}
+                  feedback={errors.typeOfWork}
+                /> 
+              </CCol>*/}
 
               {/* Operators Section */}
               {/* <CCol md={12}>

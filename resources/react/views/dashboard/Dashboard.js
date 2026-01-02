@@ -78,7 +78,8 @@ const Dashboard = (Props) => {
     totalOutstanding: 0,
     totalSales: 0,
     ytdPandL: 0,
-    totalProjects : 0,
+    totalProjects: 0,
+    totalWorkingReading: 0,
   })
 
   const mode = userData?.company_info?.appMode ?? 'advance'
@@ -743,6 +744,22 @@ const Dashboard = (Props) => {
           }, 0);
         };
 
+        // Calculate total working reading (SUM of end_reading - start_reading)
+        const calcTotalWorkingReading = (logs) => {
+          return logs.reduce((sum, log) => {
+            const start = parseFloat(log.start_reading);
+            const end = parseFloat(log.end_reading);
+
+            // Only count valid completed readings
+            if (!isNaN(start) && !isNaN(end) && end > start) {
+              return sum + (end - start);
+            }
+            return sum;
+          }, 0);
+        };
+
+        const totalWorkingReading = calcTotalWorkingReading(machineLogs);
+
         const calcAllExpenses = (allExpenses) => {
           return allExpenses.reduce((sum, expense) => sum + (parseFloat(expense.total_price) || 0), 0);
         };
@@ -806,6 +823,7 @@ const Dashboard = (Props) => {
             totalSales,
             ytdPandL,
             totalProjects,
+            totalWorkingReading,
           });
           setReportMonth({
             monthlySales,
@@ -1591,23 +1609,24 @@ const Dashboard = (Props) => {
 
       {mode === 'advance' && (
         <WidgetsDropdown
-          className="mb-4"
+          className="mb-2"
           reportMonth={reportMonth}
           totalSales={summary.totalSales}
           totalExpense={summary.totalExpenseAll}
+          totalWorkingReading={summary.totalWorkingReading}
         />
       )}
 
       {/* Company summary cards */}
       {(user === 0 || user === 1) && (
-        <CRow className="g-2 mb-4">
+        <CRow className="g-2 mb-3">
           {/* <CCol xs={6} md={3} lg={3}>
             <div className="rounded p-2 text-center bg-primary text-white shadow-sm">
               <small className="d-block">Customers</small>
               <strong className="fs-6">{summaryLoading ? '-' : summary.totalProjects}</strong>
             </div>
           </CCol> */}
-          <CCol xs={6} md={3} lg={4}>
+          <CCol xs={12} md={4}>
             <div className="rounded p-2 text-center bg-primary text-white shadow-sm">
               <small className="d-block">Total Machines</small>
               <strong className="fs-6">{summaryLoading ? '-' : summary.machineCount}</strong>
@@ -1625,15 +1644,23 @@ const Dashboard = (Props) => {
               <strong className="fs-6">{summaryLoading ? '-' : formatIndianNumber(summary.totalExpenseAll)}</strong>
             </div>
           </CCol>*/}
-          <CCol xs={6} md={3} lg={4}>
-            <div className={`rounded p-2 text-center shadow-sm ${summary.totalSales - summary.totalOutstanding >= 0 ? 'bg-secondary text-white' : 'bg-danger text-white'}`}>
+{/* 
+          <CCol xs={6} md={3} lg={3}>
+            <div className="rounded p-2 text-center bg-secondary text-white shadow-sm">
+              <small className="d-block">Total Hours</small>
+              <strong className="fs-4">{summaryLoading ? '-' : summary.totalWorkingReading}</strong>
+            </div>
+          </CCol> */}
+
+          <CCol xs={12} md={4}>
+            <div className={`rounded p-2 text-center shadow-sm ${summary.totalSales - summary.totalOutstanding >= 0 ? 'bg-success text-white' : 'bg-danger text-white'}`}>
               <small className="d-block">Payment Received</small>
               <strong className="fs-6">
                 {summaryLoading ? '-' : formatIndianNumber(summary.totalSales - summary.totalOutstanding)}
               </strong>
             </div>
-          </CCol> 
-          <CCol xs={6} md={3} lg={4}>
+          </CCol>
+          <CCol xs={12} md={4}>
             <div className="rounded p-2 text-center bg-danger text-white shadow-sm">
               <small className="d-block">Credit Amount</small>
               <strong className="fs-6">{summaryLoading ? '-' : formatIndianNumber(summary.totalOutstanding)}</strong>
@@ -2074,10 +2101,10 @@ const Dashboard = (Props) => {
                           quantityModal.product.stock ?? 0,
                           quantityModal.product.qty || 1
                         ).color === 'danger' ? 'bg-danger' :
-                            getStockStatus(
-                              quantityModal.product.stock ?? 0,
-                              quantityModal.product.qty || 1
-                            ).color === 'warning' ? 'bg-warning text-dark' : 'bg-success'
+                          getStockStatus(
+                            quantityModal.product.stock ?? 0,
+                            quantityModal.product.qty || 1
+                          ).color === 'warning' ? 'bg-warning text-dark' : 'bg-success'
                           }`}
                         style={{
                           animation: getStockStatus(
@@ -2164,7 +2191,7 @@ const Dashboard = (Props) => {
 
 
 
-      {(user === 0 || user === 1) && mode === 'advance' && !isRestrictedPlan() &&(
+      {(user === 0 || user === 1) && mode === 'advance' && !isRestrictedPlan() && (
         <CCard className="mt-4 mb-4">
           <CCardBody>
             <CRow>
@@ -2183,10 +2210,11 @@ const Dashboard = (Props) => {
             <MainChart
               monthlyPandL={reportMonth.monthlyPandL}
               monthlySales={reportMonth.monthlySales}
-        monthlyExpense={reportMonth.monthlyExpense}
-        totalSales={summary.totalSales}
-        totalExpense={summary.totalExpenseAll}
-        totalPandL={summary.totalSales - summary.totalExpenseAll}
+              monthlyExpense={reportMonth.monthlyExpense}
+              totalSales={summary.totalSales}
+              totalExpense={summary.totalExpenseAll}
+              totalPandL={summary.totalSales - summary.totalExpenseAll}
+              totalWorkingReading={summary.totalWorkingReading}
             />
           </CCardBody>
         </CCard>

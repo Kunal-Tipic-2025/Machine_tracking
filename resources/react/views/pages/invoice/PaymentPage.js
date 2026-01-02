@@ -33,6 +33,30 @@ const PaymentPage = () => {
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [modalAmountPaid, setModalAmountPaid] = useState(0);
     const [modalPaymentMode, setModalPaymentMode] = useState('Cash');
+    const [modalRemark, setModalRemark] = useState('');
+
+    //Adding work type
+    const [workTypes, setWorkTypes] = useState([]);
+    useEffect(() => {
+        const fetchWorkTypes = async () => {
+            try {
+                const res = await getAPICall('/api/workingType');
+                setWorkTypes(res || []);
+            } catch (err) {
+                console.error('Error fetching work types', err);
+            }
+        };
+
+        fetchWorkTypes();
+    }, []);
+
+    const workTypeMap = React.useMemo(() => {
+        const map = {};
+        workTypes.forEach(wt => {
+            map[wt.id] = wt.type_of_work;
+        });
+        return map;
+    }, [workTypes]);
 
     const TruncatedCell = ({ children, maxLength = 8 }) => {
         const text = String(children || '').trim();
@@ -53,7 +77,7 @@ const PaymentPage = () => {
     const company = userData?.company_info;
 
     console.log("User : ", company);
-    
+
 
     const [formData, setFormData] = useState({
         project_name: '',
@@ -76,6 +100,7 @@ const PaymentPage = () => {
         amountPaid: 0,
         paymentMode: 'Cash',
         is_advance: false,
+        modalRemark: '',
     });
 
 
@@ -225,6 +250,7 @@ const PaymentPage = () => {
     const openRecordPayment = () => {
         setModalAmountPaid(formData.amountPaid || 0);
         setModalPaymentMode(formData.paymentMode || 'Cash');
+        setModalRemark(formData.modalRemark || '');
         setShowPaymentModal(true);
     };
 
@@ -237,6 +263,7 @@ const PaymentPage = () => {
             ...prev,
             amountPaid: Number(modalAmountPaid) || 0,
             paymentMode: modalPaymentMode || 'Cash',
+            modalRemark: modalRemark || ''
         }));
         setShowPaymentModal(false);
     };
@@ -300,7 +327,7 @@ const PaymentPage = () => {
 
             const updatedData = {
                 paid_amount: formData.amountPaid,  // or whatever field you have
-                payment_mode: formData.paymentMode?.trim() || 'Cash'
+                payment_mode: formData.paymentMode?.trim() || 'Cash',
             };
 
             const response = await fetch(`/api/project-payments/${id}/status`, {
@@ -336,6 +363,7 @@ const PaymentPage = () => {
             remaining: response.total - formData?.amountPaid,
             is_completed: response.total - formData?.amountPaid <= 0,
             date: today,
+            remark: formData?.modalRemark,
         };
 
         try {
@@ -375,7 +403,8 @@ const PaymentPage = () => {
                 prices,
                 [],
                 lang,
-                'blob'
+                'blob',
+                workTypeMap
             );
 
             const fileName = `${formData.invoice_number}_${formData.name}.pdf`;
@@ -517,7 +546,8 @@ const PaymentPage = () => {
                 prices,
                 [],
                 lang,
-                'blob'
+                'blob',
+                workTypeMap
             );
             if (pdfBlob) {
                 const url = URL.createObjectURL(pdfBlob);
@@ -783,11 +813,14 @@ const PaymentPage = () => {
                                             <CTableHeaderCell style={{ width: '50px', textAlign: 'center' }}>Sr No</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '100px', textAlign: 'center' }}>Work Date</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '110px', textAlign: 'center' }}>Machine</CTableHeaderCell>
+                                            <CTableHeaderCell style={{ width: '80px', textAlign: 'center' }}>Mode</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '100px', textAlign: 'center' }}>Operator</CTableHeaderCell>
+
+                                            <CTableHeaderCell style={{ width: '130px', textAlign: 'center' }}>Work Type</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '90px', textAlign: 'center' }}>Start</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '90px', textAlign: 'center' }}>End</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '90px', textAlign: 'center' }}>Net</CTableHeaderCell>
-                                            <CTableHeaderCell style={{ width: '80px', textAlign: 'center' }}>Mode</CTableHeaderCell>
+
                                             <CTableHeaderCell style={{ width: '100px', textAlign: 'center' }}>Price/Hr</CTableHeaderCell>
                                             <CTableHeaderCell style={{ width: '110px', textAlign: 'center' }}>Total</CTableHeaderCell>
                                         </CTableRow>
@@ -818,14 +851,21 @@ const PaymentPage = () => {
                                                         <TruncatedCell maxLength={8}>{machine?.machine_name ?? '—'}</TruncatedCell>
                                                     </CTableDataCell>
                                                     <CTableDataCell>
+                                                        <TruncatedCell maxLength={6}>{mode?.mode ?? '—'}</TruncatedCell>
+                                                    </CTableDataCell>
+                                                    <CTableDataCell>
                                                         <TruncatedCell maxLength={8}>{operator?.name ?? '—'}</TruncatedCell>
                                                     </CTableDataCell>
+                                                    <CTableDataCell className="text-center">
+                                                        <TruncatedCell maxLength={12}>
+                                                            {workTypeMap[log.data?.work_type_id] || '—'}
+                                                        </TruncatedCell>
+                                                    </CTableDataCell>
+
                                                     <CTableDataCell className="text-left">{start}</CTableDataCell>
                                                     <CTableDataCell className="text-left">{end}</CTableDataCell>
                                                     <CTableDataCell className="text-left">{net.toFixed(2)}</CTableDataCell>
-                                                    <CTableDataCell>
-                                                        <TruncatedCell maxLength={6}>{mode?.mode ?? '—'}</TruncatedCell>
-                                                    </CTableDataCell>
+
                                                     <CTableDataCell className="text-end">{price}</CTableDataCell>
                                                     <CTableDataCell className="text-end fw-semibold">₹{total.toFixed(2)}</CTableDataCell>
                                                 </CTableRow>
@@ -834,7 +874,7 @@ const PaymentPage = () => {
 
                                         {/* === GRAND TOTAL ROW === */}
                                         <CTableRow className="table-secondary fw-bold">
-                                            <CTableDataCell colSpan={6} className="text-end">
+                                            <CTableDataCell colSpan={8} className="text-end">
                                                 Grand Total:
                                             </CTableDataCell>
                                             <CTableDataCell className="text-end">
@@ -844,7 +884,7 @@ const PaymentPage = () => {
                                                     return sum + Math.max(0, e - s);
                                                 }, 0).toFixed(2)}
                                             </CTableDataCell>
-                                            <CTableDataCell colSpan={2}></CTableDataCell>
+                                            <CTableDataCell colSpan={1}></CTableDataCell>
                                             <CTableDataCell className="text-end">₹{response?.total ?? 0}</CTableDataCell>
                                         </CTableRow>
                                     </CTableBody>
@@ -1003,6 +1043,23 @@ const PaymentPage = () => {
                                             <option value="Bank Transfer">Credit</option>
                                         </select>
                                     </div>
+
+                                    <div style={{ marginBottom: 12 }}>
+                                        <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+                                            Remark
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            value={modalRemark}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+
+
+                                                setModalRemark(value);
+                                            }} />
+                                    </div>
+
                                 </div>
                                 <div style={{ padding: 16, borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                                     <CButton color="secondary" variant="outline" onClick={closeRecordPayment}>Cancel</CButton>
