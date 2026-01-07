@@ -87,6 +87,9 @@ const MachineUsageForm = () => {
   const [isSavingEnd, setIsSavingEnd] = useState(false);
   const [machinePrices, setMachinePrices] = useState([]);
 
+  const [workTypeSearchQuery, setWorkTypeSearchQuery] = useState({});
+  const [showWorkTypeDropdown, setShowWorkTypeDropdown] = useState({});
+
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [newProjectFormData, setNewProjectFormData] = useState({
     customer_name: "",
@@ -155,6 +158,8 @@ const MachineUsageForm = () => {
     setIsEndReadingMode(false);
     setSelectedOperators([]);
     setShowDropdown(false);
+    setWorkTypeSearchQuery({});
+    setShowWorkTypeDropdown({});
   }, [userType, userData?.id]);
 
   useEffect(() => {
@@ -239,6 +244,7 @@ const MachineUsageForm = () => {
   const [showWorkTypeModal, setShowWorkTypeModal] = useState(false);
   const [newWorkTypeName, setNewWorkTypeName] = useState('');
   const [addingWorkTypeForIndex, setAddingWorkTypeForIndex] = useState(null);
+
   const handleSaveWorkType = async () => {
     if (!newWorkTypeName.trim()) {
       showToast('danger', 'Please enter work type name');
@@ -259,6 +265,15 @@ const MachineUsageForm = () => {
       };
 
       setWorkTypes(prev => [...prev, newOption]);
+      // Update search query to show selected value
+      setWorkTypeSearchQuery(prev => ({
+        ...prev,
+        [addingWorkTypeForIndex]: newOption.label
+      }));
+      setShowWorkTypeDropdown(prev => ({
+        ...prev,
+        [addingWorkTypeForIndex]: false
+      }));
 
       // Auto-select for the correct row
       if (addingWorkTypeForIndex !== null) {
@@ -278,6 +293,18 @@ const MachineUsageForm = () => {
       console.error(err);
       showToast('danger', 'Failed to add work type');
     }
+  };
+
+  const handleShowAllWorkTypes = (index) => {
+    setWorkTypeSearchQuery(prev => ({ ...prev, [index]: '' }));
+    setShowWorkTypeDropdown(prev => ({ ...prev, [index]: true }));
+  };
+
+  const getFilteredWorkTypes = (searchQuery) => {
+    if (!searchQuery) return workTypes;
+    return workTypes.filter(wt =>
+      wt.label.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   };
 
   const fetchProjects = useCallback(async (query) => {
@@ -1118,35 +1145,25 @@ const MachineUsageForm = () => {
                             </CCol>
 
                             {/* <CCol xs={12} md={2} className="p-1">
-                              <CFormLabel>Work Type <span style={{ color: 'red' }}>*</span></CFormLabel>
-                              <Select
-                                options={workTypes}
-                                isSearchable
-                                placeholder="Select Type"
-                                value={workTypes.find(w => w.value === reading.work_type_id) || null}
-                                onChange={(selected) => {
-                                  handleMachineReadingChange(
-                                    index,
-                                    'work_type_id',
-                                    selected ? selected.value : ''
-                                  );
-                                }}
-                              />
-                            </CCol> */}
-
-                            <CCol xs={12} md={2} className="p-1">
                               <CFormLabel className="d-flex justify-content-between align-items-center">
                                 <span>Work Type <span style={{ color: 'red' }}>*</span></span>
                                 <CButton
                                   size="sm"
                                   color="primary"
                                   variant="outline"
+                                  style={{
+                                    borderRadius: '50%',
+                                    width: '20px',
+                                    height: '20px',
+                                    padding: 0,
+                                    lineHeight: '10px',
+                                  }}
                                   onClick={() => {
                                     setAddingWorkTypeForIndex(index);
                                     setShowWorkTypeModal(true);
                                   }}
                                 >
-                                  + Add
+                                  +
                                 </CButton>
                               </CFormLabel>
 
@@ -1163,8 +1180,90 @@ const MachineUsageForm = () => {
                                   );
                                 }}
                               />
-                            </CCol>
+                            </CCol> */}
 
+                            <CCol xs={12} md={2} className="p-1">
+                              <CFormLabel>Work Type <span style={{ color: 'red' }}>*</span></CFormLabel>
+                              <CInputGroup>
+                                <CFormInput
+                                  type="text"
+                                  value={workTypeSearchQuery[index] || ''}
+                                  onChange={(e) => {
+                                    setWorkTypeSearchQuery(prev => ({ ...prev, [index]: e.target.value }));
+                                    setShowWorkTypeDropdown(prev => ({ ...prev, [index]: true }));
+                                  }}
+                                  placeholder="Search work type..."
+                                />
+                                { (
+                                  <CButton
+                                    type="button"
+                                    color="danger"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleMachineReadingChange(index, 'work_type_id', '');
+                                      setWorkTypeSearchQuery(prev => ({ ...prev, [index]: '' }));
+                                      setShowWorkTypeDropdown(prev => ({ ...prev, [index]: false }));
+                                    }}
+                                  >
+                                    ✕
+                                  </CButton>
+                                )}
+                                <CButton
+                                  type="button"
+                                  color="primary"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShowAllWorkTypes(index)}
+                                >
+                                  Show All
+                                </CButton>
+                              </CInputGroup>
+                              {showWorkTypeDropdown[index] && (
+                                <div
+                                  className="border rounded bg-white position-absolute"
+                                  style={{
+                                    maxHeight: "200px",
+                                    overflowY: "auto",
+                                    zIndex: 1000,
+                                    width: 'calc(100% - 0.5rem)'
+                                  }}
+                                >
+                                  {getFilteredWorkTypes(workTypeSearchQuery[index]).length > 0 ? (
+                                    getFilteredWorkTypes(workTypeSearchQuery[index]).map((workType) => (
+                                      <div
+                                        key={workType.value}
+                                        className="p-2 hover-bg-light"
+                                        style={{ cursor: "pointer" }}
+                                        onClick={() => {
+                                          handleMachineReadingChange(index, 'work_type_id', workType.value);
+                                          setWorkTypeSearchQuery(prev => ({ ...prev, [index]: workType.label }));
+                                          setShowWorkTypeDropdown(prev => ({ ...prev, [index]: false }));
+                                        }}
+                                      >
+                                        {workType.label}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="p-2">
+                                      <div>No work type found.</div>
+                                      <CButton
+                                        color="primary"
+                                        size="sm"
+                                        className="mt-2"
+                                        onClick={() => {
+                                          setAddingWorkTypeForIndex(index);
+                                          setShowWorkTypeModal(true);
+                                          setShowWorkTypeDropdown(prev => ({ ...prev, [index]: false }));
+                                        }}
+                                      >
+                                        Add New Work Type
+                                      </CButton>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </CCol>
 
                             <CCol xs={12} md={2} className="p-1">
                               <CFormLabel>Start Reading</CFormLabel>

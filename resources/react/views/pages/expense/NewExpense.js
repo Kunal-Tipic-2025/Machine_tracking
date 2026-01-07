@@ -48,6 +48,10 @@ const NewExpense = () => {
   const [users, setUsers] = useState([]);
   // console.log(customerName);
 
+  const [operators, setOperators] = useState([]);
+  const [isOperatorExpense, setIsOperatorExpense] = useState(false);
+
+
 
 
   const fetchMachineries = async () => {
@@ -102,6 +106,7 @@ const NewExpense = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { t } = useTranslation("global");
+  const user = getUserData();
   const [state, setState] = useState({
     project_id: '', // ✅ Changed from customer_id to project_id
     name: '',
@@ -118,10 +123,11 @@ const NewExpense = () => {
     pending_amount: '',
     show: true,
     isGst: false,
-    company_id: '',
+    company_id: user?.company_id || '',
     photoAvailable: true,
     photo_url: null,
     photo_remark: '',
+    operator_id: '',
 
     // New Fields in form 
     bank_name: '',
@@ -160,6 +166,7 @@ const NewExpense = () => {
     fetchMachineries();
     fetchProjects(); // Fetch projects
     fetchUsers();
+    fetchOperators();
     // Auto-set company_id from session if available
     const user = getUserData();
     if (user?.company_id) {
@@ -170,6 +177,32 @@ const NewExpense = () => {
   useEffect(() => {
     fetchExpenseTypes();
   }, [i18n.language]);
+
+
+  useEffect(() => {
+    if (!isOperatorExpense) return;
+
+    const user = getUserData();
+
+    // type === 2 → operator logged in
+    if (user?.type === 2) {
+      setState(prev => ({
+        ...prev,
+        operator_id: user.id
+      }));
+    }
+  }, [isOperatorExpense]);
+
+  const fetchOperators = async () => {
+    try {
+      const companyId = getUserData()?.company_id;
+      const response = await getAPICall(`/api/operatorsByCompanyIdOperator`);
+      console.log('setOperator', operators);
+      setOperators(response || []);
+    } catch (err) {
+      showToast('danger', 'Error fetching operators');
+    }
+  };
 
   // const calculateFinalAmount = (item) => {
   //   const qtyNum = parseFloat(item.qty) || 0;
@@ -431,6 +464,7 @@ const NewExpense = () => {
   //     }
   //   };
 
+  
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -469,7 +503,28 @@ const NewExpense = () => {
     // Add file only if selected (UI for photo is currently commented out)
     if (state.photo_url instanceof File) formData.append("photo_url", state.photo_url);
 
-    if (state.expense_id && state.price > 0 && state.qty > 0) {
+    if (isOperatorExpense && !state.operator_id) {
+      showToast('danger', 'Operator is required');
+      return;
+    }
+    if (isOperatorExpense) {
+      formData.append('operator_id', state.operator_id);
+    }
+
+    const isValidNormalExpense =
+      !isOperatorExpense &&
+      state.expense_id &&
+      state.price > 0 &&
+      state.qty > 0;
+
+    const isValidOperatorExpense =
+      isOperatorExpense &&
+      state.expense_id &&
+      state.total_price > 0 &&
+      state.operator_id;
+
+
+    if (isValidNormalExpense || isValidOperatorExpense) {
       try {
         const resp = await postFormData("/api/expense", formData);
         console.log("response", resp);
@@ -701,16 +756,35 @@ const NewExpense = () => {
                         value={
                           options.find(opt => String(opt.value) === String(state.expense_id)) || null
                         }
+                        // onChange={(selectedOption) => {
+                        //   const category = String(selectedOption?.expense_category || '').toLowerCase();
+                        //   const labelText = String(selectedOption?.label || '').toLowerCase();
+                        //   const isMachineRelated = category.includes('machine') || labelText.includes('machine') || category.includes('मशीन') || labelText.includes('मशीन');
+                        //   setState(prev => ({
+                        //     ...prev,
+                        //     expense_id: selectedOption ? selectedOption.value : "",
+                        //     open: isMachineRelated
+                        //   }));
+                        // }}
                         onChange={(selectedOption) => {
-                          const category = String(selectedOption?.expense_category || '').toLowerCase();
-                          const labelText = String(selectedOption?.label || '').toLowerCase();
-                          const isMachineRelated = category.includes('machine') || labelText.includes('machine') || category.includes('मशीन') || labelText.includes('मशीन');
+                          console.log('selectedOption', selectedOption);
+                          const category = String(selectedOption?.label || '').toLowerCase();
+
+                          const isOperator = category === 'operator';
+                          const isMachineRelated = category.includes('machine');
+
+                          setIsOperatorExpense(isOperator);
+
                           setState(prev => ({
                             ...prev,
                             expense_id: selectedOption ? selectedOption.value : "",
-                            open: isMachineRelated
+                            open: isMachineRelated,
+                            customer_id: '',     // reset customer
+                            project_id: '',
+                            operator_id: ''      // reset operator
                           }));
                         }}
+
                         options={options}
                         placeholder={t("MSG.select_expense_type_msg")}
                         isClearable
@@ -768,40 +842,69 @@ const NewExpense = () => {
                   )}
 
                   <div className="col-sm-4">
-                    <div className="">
-                      <CFormLabel htmlFor="customer_id"><b>{t("LABELS.customer_name")}</b></CFormLabel>
-                      <Select
-                        id="customer_id"
-                        name="customer_id"
-                        value={
-                          projects
-                            .map(p => ({ value: p.id, label: p.customer_name }))
-                            .find(opt => String(opt.value) === String(state.customer_id)) || null
-                        }
-                        onChange={(selectedOption) =>
-                          setState(prev => ({
-                            ...prev,
-                            customer_id: selectedOption ? selectedOption.value : "",
-                            project_id: selectedOption ? selectedOption.value : ""
-                          }))
-                        }
-                        options={projects.map(p => ({
-                          value: p.id,
-                          label: p.customer_name
-                        }))}
-                        placeholder="Select Customer"
-                        isClearable
-                        isSearchable
-                        styles={{
-                          control: (base) => ({
-                            ...base,
-                            borderRadius: "0.5rem",
-                            borderColor: "#ced4da",
-                            minHeight: "38px",
-                          }),
-                        }}
-                      />
-                    </div>
+                    {isOperatorExpense ? (
+                      <>
+                        <CFormLabel><b>{t("LABELS.operator_name")}</b></CFormLabel>
+
+                        <Select
+                          value={
+                            operators
+                              .map(o => ({ value: o.id, label: o.name }))
+                              .find(opt => String(opt.value) === String(state.operator_id)) || null
+                          }
+                          onChange={(opt) =>
+                            setState(prev => ({
+                              ...prev,
+                              operator_id: opt ? opt.value : ''
+                            }))
+                          }
+                          options={operators.map(o => ({
+                            value: o.id,
+                            label: o.name
+                          }))}
+                          isDisabled={getUserData()?.type === 2} // 🔒 operator cannot change
+                          placeholder="Select Operator"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div className="">
+                          <CFormLabel htmlFor="customer_id"><b>{t("LABELS.customer_name")}</b></CFormLabel>
+                          <Select
+                            id="customer_id"
+                            name="customer_id"
+                            value={
+                              projects
+                                .map(p => ({ value: p.id, label: p.customer_name }))
+                                .find(opt => String(opt.value) === String(state.customer_id)) || null
+                            }
+                            onChange={(selectedOption) =>
+                              setState(prev => ({
+                                ...prev,
+                                customer_id: selectedOption ? selectedOption.value : "",
+                                project_id: selectedOption ? selectedOption.value : ""
+                              }))
+                            }
+                            options={projects.map(p => ({
+                              value: p.id,
+                              label: p.customer_name
+                            }))}
+                            placeholder={t("LABELS.customer_name")}
+                            isClearable
+                            isSearchable
+                            styles={{
+                              control: (base) => ({
+                                ...base,
+                                borderRadius: "0.5rem",
+                                borderColor: "#ced4da",
+                                minHeight: "38px",
+                              }),
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
                   </div>
 
 
@@ -835,7 +938,7 @@ const NewExpense = () => {
                   </div>
                 </div>
 
-                <div className="row align-items-end">
+                {!isOperatorExpense && (<div className="row align-items-end">
                   <div className="col-sm-4">
                     <div className="mb-3">
                       <CFormLabel htmlFor="price">
@@ -924,7 +1027,23 @@ const NewExpense = () => {
                       />
                     </div>
                   </div>
-                </div>
+                </div>)}
+
+                {isOperatorExpense && (
+                  <div className="col-sm-4">
+                    <CFormLabel><b>Total Amount</b></CFormLabel>
+                    <CFormInput
+                      type="number"
+                      value={state.total_price}
+                        onFocus={() => setState(prev => ({ ...prev, total_price: '' }))}
+                      onChange={(e) =>
+                        setState(prev => ({ ...prev, total_price: e.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                )}
+
 
                 <div className="row">
                   {/* <div className="col-sm-3">

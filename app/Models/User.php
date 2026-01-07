@@ -59,4 +59,26 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    //     public function salaryCycles()
+    // {
+    //     return $this->hasMany(SalaryCycle::class, 'operator_id');
+    // }
+
+    // User.php
+
+    public function salaryPayments()
+    {
+        return $this->hasMany(SalaryPayment::class, 'operator_id');
+    }
+
+    public function advances()
+    {
+        return $this->hasMany(AdvanceRecord::class, 'operator_id');
+    }
+
+    public function expenses()
+    {
+        return $this->hasMany(OperatorExpense::class, 'operator_id');
+    }
 }

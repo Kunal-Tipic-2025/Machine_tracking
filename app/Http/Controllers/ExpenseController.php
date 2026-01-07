@@ -357,7 +357,7 @@
 // //         ]);
 // //     }
 
- 
+
 
 // // public function expenseReport(Request $request)
 // // {
@@ -798,7 +798,7 @@
 //         ]);
 //     }
 
- 
+
 
 // public function expenseReport(Request $request)
 // {
@@ -1047,7 +1047,7 @@
 //     {
 //         $user = Auth::user();
 //         // $companyId = $user->company_id;
-        
+
 //         $userType = $user->type;
 
 //         try {
@@ -1246,6 +1246,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\ImageCompressor;
+use App\Models\ExpenseType;
+use App\Models\OperatorExpense;
+use Carbon\Carbon;
+use Illuminate\Validation\Rule as ValidationRule;
+use Livewire\Attributes\Rule;
 
 class ExpenseController extends Controller
 {
@@ -1316,119 +1321,242 @@ class ExpenseController extends Controller
     }
 
     public function index1(Request $request)
-{
-    try {
-        $companyId = $request->query('company_id');
+    {
+        try {
+            $companyId = $request->query('company_id');
 
-        if (!$companyId) {
-            return response()->json(['error' => 'company_id is required'], 422);
+            if (!$companyId) {
+                return response()->json(['error' => 'company_id is required'], 422);
+            }
+
+            $expenses = Expense::with([
+                'expenseType:id,name,expense_category',
+                'project:id,project_name'
+            ])
+                ->where('company_id', $companyId)
+                ->orderBy('id', 'desc')
+                ->get();
+
+            return response()->json([
+                $expenses,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        $expenses = Expense::with([
-            'expenseType:id,name,expense_category',
-            'project:id,project_name'
-        ])
-        ->where('company_id', $companyId)
-        ->orderBy('id', 'desc')
-        ->get();
-
-        return response()->json([
-            $expenses,
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
     }
-}
 
 
+
+    // public function store(Request $request)
+    // {
+    //     $user = Auth::user();
+
+    //     $request->validate([
+    //         'company_id' => 'required|integer',
+    //         'expense_date' => 'required|date',
+    //         'price' => 'required|numeric|min:0',
+    //         'qty' => 'required|numeric|min:0',
+    //         'total_price' => 'required|numeric|min:0',
+    //         'contact' => 'nullable|numeric',
+    //         'payment_by' => 'nullable|string',
+    //         'payment_type' => 'nullable|string',
+    //         'pending_amount' => 'nullable|numeric',
+    //         'show' => 'nullable|boolean',
+    //         'isGst' => 'nullable|boolean',
+    //         'photoAvailable' => 'nullable|boolean',
+    //         'photo_url' => 'nullable|file|mimes:jpg,jpeg,png',
+    //         'photo_remark' => 'nullable|string',
+    //         'bank_name' => 'nullable|string',
+    //         'acc_number' => 'nullable|string',
+    //         'ifsc' => 'nullable|string',
+    //         'aadhar' => 'nullable|string',
+    //         'pan' => 'nullable|string',
+    //         'transaction_id' => 'nullable|string',
+    //         'machine_id' => 'nullable|string',
+    //         'customer_id' => 'nullable|integer',
+    //     ]);
+
+    //     $photoPath = null;
+    //     if ($request->hasFile('photo_url')) {
+    //         $photoPath = ImageCompressor::compressAndSave(
+    //             $request->file('photo_url'),
+    //             'bill',
+    //             1024
+    //         );
+    //     }
+
+    //     $expense = Expense::create([
+    //         'project_id' => $request->project_id,
+    //         'name' => $request->name,
+    //         'expense_date' => $request->expense_date,
+    //         'price' => $request->price,
+    //         'qty' => $request->qty,
+    //         'total_price' => $request->total_price,
+    //         'expense_id' => $request->expense_id,
+    //         'contact' => $request->contact,
+    //         'payment_by' => $request->payment_by,
+    //         'payment_type' => $request->payment_type,
+    //         'pending_amount' => $request->pending_amount,
+    //         'isGst' => $request->isGst,
+    //         'photoAvailable' => $request->photoAvailable,
+    //         'photo_url' => $photoPath,
+    //         'photo_remark' => $request->photo_remark,
+    //         'bank_name' => $request->bank_name,
+    //         'acc_number' => $request->acc_number,
+    //         'ifsc' => $request->ifsc,
+    //         'aadhar' => $request->aadhar,
+    //         'pan' => $request->pan,
+    //         'transaction_id' => $request->transaction_id,
+    //         'machine_id' => $request->machine_id,
+    //         'show' => $request->show,
+    //         'customer_id' => $request->customer_id,
+    //         'company_id' => $request->company_id,   // ✅ frontend
+    //         'created_by' => $user ? $user->id : 0,
+    //         'updated_by' => $user ? $user->id : 0,
+    //         'desc'=> $request->desc,
+    //     ]);
+
+    //     ExpenseSummary::updateOrCreate(
+    //         [
+    //             'expense_date' => $request->expense_date,
+    //             'company_id' => $request->company_id, // ✅ frontend
+    //             'project_id' => $request->project_id,
+    //         ],
+    //         [
+    //             'total_expense' => DB::raw('total_expense + ' . $request->total_price),
+    //             'expense_count' => DB::raw('expense_count + 1'),
+    //         ]
+    //     );
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Expense created successfully.',
+    //         'expense' => $expense,
+    //     ]);
+    // }
 
     public function store(Request $request)
     {
+        $expenseType = ExpenseType::findOrFail($request->expense_id);
         $user = Auth::user();
 
-        $request->validate([
-            'company_id' => 'required|integer',
-            'expense_date' => 'required|date',
-            'price' => 'required|numeric|min:0',
-            'qty' => 'required|numeric|min:0',
-            'total_price' => 'required|numeric|min:0',
-            'contact' => 'nullable|numeric',
-            'payment_by' => 'nullable|string',
-            'payment_type' => 'nullable|string',
-            'pending_amount' => 'nullable|numeric',
-            'show' => 'nullable|boolean',
-            'isGst' => 'nullable|boolean',
-            'photoAvailable' => 'nullable|boolean',
-            'photo_url' => 'nullable|file|mimes:jpg,jpeg,png',
-            'photo_remark' => 'nullable|string',
-            'bank_name' => 'nullable|string',
-            'acc_number' => 'nullable|string',
-            'ifsc' => 'nullable|string',
-            'aadhar' => 'nullable|string',
-            'pan' => 'nullable|string',
-            'transaction_id' => 'nullable|string',
-            'machine_id' => 'nullable|string',
-            'customer_id' => 'nullable|integer',
-        ]);
+        DB::beginTransaction();
 
-        $photoPath = null;
-        if ($request->hasFile('photo_url')) {
-            $photoPath = ImageCompressor::compressAndSave(
-                $request->file('photo_url'),
-                'bill',
-                1024
-            );
+        try {
+            if ($expenseType->name === 'Operator') {
+
+                $request->validate([
+                    'operator_id' => [
+                        'required',
+                        'integer',
+                        ValidationRule::exists('users', 'id')->where(function ($query) {
+                            $query->where('type', 2);
+                        }),
+                    ],
+                    'total_price' => 'required|numeric|min:0',
+                    'desc'        => 'nullable|string',
+                ]);
+                OperatorExpense::create([
+                    'operator_id'   => $request->operator_id,
+                    'company_id'    =>  $user->company_id,
+                    'about_expenses' => $request->desc,
+                    'total_amount'  => $request->total_price,
+                    'expense_date'  => $request->expense_date,
+                    'created_at' => Carbon::now()->toDateString(),
+                    'is_settle' => false
+                ]);
+            } else {
+
+                $request->validate([
+                    'company_id' => 'required|integer',
+                    'expense_date' => 'required|date',
+                    'price' => 'required|numeric|min:0',
+                    'qty' => 'required|numeric|min:0',
+                    'total_price' => 'required|numeric|min:0',
+                    'contact' => 'nullable|numeric',
+                    'payment_by' => 'nullable|string',
+                    'payment_type' => 'nullable|string',
+                    'pending_amount' => 'nullable|numeric',
+                    'show' => 'nullable|boolean',
+                    'isGst' => 'nullable|boolean',
+                    'photoAvailable' => 'nullable|boolean',
+                    'photo_url' => 'nullable|file|mimes:jpg,jpeg,png',
+                    'photo_remark' => 'nullable|string',
+                    'bank_name' => 'nullable|string',
+                    'acc_number' => 'nullable|string',
+                    'ifsc' => 'nullable|string',
+                    'aadhar' => 'nullable|string',
+                    'pan' => 'nullable|string',
+                    'transaction_id' => 'nullable|string',
+                    'machine_id' => 'nullable|string',
+                    'customer_id' => 'nullable|integer',
+                ]);
+
+                $photoPath = null;
+                if ($request->hasFile('photo_url')) {
+                    $photoPath = ImageCompressor::compressAndSave(
+                        $request->file('photo_url'),
+                        'bill',
+                        1024
+                    );
+                }
+
+                $expense = Expense::create([
+                    'project_id' => $request->project_id,
+                    'name' => $request->name,
+                    'expense_date' => $request->expense_date,
+                    'price' => $request->price,
+                    'qty' => $request->qty,
+                    'total_price' => $request->total_price,
+                    'expense_id' => $request->expense_id,
+                    'contact' => $request->contact,
+                    'payment_by' => $request->payment_by,
+                    'payment_type' => $request->payment_type,
+                    'pending_amount' => $request->pending_amount,
+                    'isGst' => $request->isGst,
+                    'photoAvailable' => $request->photoAvailable,
+                    'photo_url' => $photoPath,
+                    'photo_remark' => $request->photo_remark,
+                    'bank_name' => $request->bank_name,
+                    'acc_number' => $request->acc_number,
+                    'ifsc' => $request->ifsc,
+                    'aadhar' => $request->aadhar,
+                    'pan' => $request->pan,
+                    'transaction_id' => $request->transaction_id,
+                    'machine_id' => $request->machine_id,
+                    'show' => $request->show,
+                    'customer_id' => $request->customer_id,
+                    'company_id' => $request->company_id,   // ✅ frontend
+                    'created_by' => $user ? $user->id : 0,
+                    'updated_by' => $user ? $user->id : 0,
+                    'desc' => $request->desc,
+                ]);
+
+                ExpenseSummary::updateOrCreate(
+                    [
+                        'expense_date' => $request->expense_date,
+                        'company_id' => $request->company_id, // ✅ frontend
+                        'project_id' => $request->project_id,
+                    ],
+                    [
+                        'total_expense' => DB::raw('total_expense + ' . $request->total_price),
+                        'expense_count' => DB::raw('expense_count + 1'),
+                    ]
+                );
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Expense created successfully.',
+                    'expense' => $expense,
+                ]);
+            }
+
+            DB::commit();
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        $expense = Expense::create([
-            'project_id' => $request->project_id,
-            'name' => $request->name,
-            'expense_date' => $request->expense_date,
-            'price' => $request->price,
-            'qty' => $request->qty,
-            'total_price' => $request->total_price,
-            'expense_id' => $request->expense_id,
-            'contact' => $request->contact,
-            'payment_by' => $request->payment_by,
-            'payment_type' => $request->payment_type,
-            'pending_amount' => $request->pending_amount,
-            'isGst' => $request->isGst,
-            'photoAvailable' => $request->photoAvailable,
-            'photo_url' => $photoPath,
-            'photo_remark' => $request->photo_remark,
-            'bank_name' => $request->bank_name,
-            'acc_number' => $request->acc_number,
-            'ifsc' => $request->ifsc,
-            'aadhar' => $request->aadhar,
-            'pan' => $request->pan,
-            'transaction_id' => $request->transaction_id,
-            'machine_id' => $request->machine_id,
-            'show' => $request->show,
-            'customer_id' => $request->customer_id,
-            'company_id' => $request->company_id,   // ✅ frontend
-            'created_by' => $user ? $user->id : 0,
-            'updated_by' => $user ? $user->id : 0,
-            'desc'=> $request->desc,
-        ]);
-
-        ExpenseSummary::updateOrCreate(
-            [
-                'expense_date' => $request->expense_date,
-                'company_id' => $request->company_id, // ✅ frontend
-                'project_id' => $request->project_id,
-            ],
-            [
-                'total_expense' => DB::raw('total_expense + ' . $request->total_price),
-                'expense_count' => DB::raw('expense_count + 1'),
-            ]
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Expense created successfully.',
-            'expense' => $expense,
-        ]);
     }
 
     public function show(Request $request, $id)
@@ -1490,7 +1618,7 @@ class ExpenseController extends Controller
             'expense_date' => $request->expense_date,
             'price' => $request->price,
             'qty' => $request->qty,
-            'desc'=> $request->desc,
+            'desc' => $request->desc,
             'total_price' => $request->total_price,
             'show' => $request->show,
             'company_id' => $request->company_id,
@@ -1689,5 +1817,28 @@ class ExpenseController extends Controller
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+     /**
+     * Get pending expenses for an operator
+     */
+    public function pending(Request $request)
+    {
+        $request->validate([
+            'operator_id' => 'required|integer|exists:users,id',
+        ]);
+
+        $expenses = OperatorExpense::where('operator_id', $request->operator_id)
+            ->where('is_settle', false)
+            ->orderBy('expense_date', 'asc')
+            ->get([
+                'id',
+                'operator_id',
+                'total_amount',
+                'expense_date',
+                'about_expenses'
+            ]);
+
+        return response()->json($expenses);
     }
 }

@@ -202,3 +202,8 @@ export async function getAPICall(api) {
 export async function deleteAPICall(api) {
   return await getOrDelete(host + api, 'DELETE');
 }
+
+export async function getWithParams(api, params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return await getOrDelete(host + api + (query ? `?${query}` : ''));
+}

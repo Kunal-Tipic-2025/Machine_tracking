@@ -212,6 +212,14 @@ export default function fetchNavItems(t1) {
             to: '/Reports/creditReport',
             className: 'ms-2',
           },
+           {
+            component: CNavItem,
+            // name: t("LABELS.project_report"),
+            name: t("Operator Report"),
+            to: '/operatorSalary',
+            className: 'ms-2',
+
+          },
         ],
       },
       {

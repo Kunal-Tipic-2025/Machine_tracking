@@ -62,6 +62,7 @@ const EditExpenseType = React.lazy(() => import('./views/pages/expense/EditExpen
 const NewExpenseType = React.lazy(() => import('./views/pages/expense/NewExpenseType'))
 const NewExpense = React.lazy(() => import('./views/pages/expense/NewExpense'))
 const expenseReport = React.lazy(() => import('./views/pages/expense/ExpenseReport'))
+const OperatorSalary = React.lazy(() => import('./views/pages/Oprator/OperatorSalary'))
 
 //Reports
 const ExpenseReport = React.lazy(() => import('./views/pages/report/ExpenseReport'))
@@ -170,6 +171,7 @@ export default function fetchRoutes() {
       { path: 'Reports/pnl_Report', name: 'Profit and Loss Report', element: PnLReport },
       { path: '/Reports/Reports', name: 'Reports', element: All_Reports },
       { path: '/machineExpense', name: 'Machine Expense', element: MachineExpenses },
+      { path: '/operatorSalary', name: 'Operator Salary', element: OperatorSalary },
 
       // { path: 'products/updateqty', name: 'Update Bulk Quantity', element: BulkQuantity },
       { path: '/resetPassword', name: 'Update Password', element: Resetpassword },
@@ -258,6 +260,8 @@ export default function fetchRoutes() {
       { path: '/invoice-payment/report', name: 'Invoice Payment Report', element: InvoicePaymentReport },
 
       { path: '/machineExpense', name: 'Machine Expense', element: MachineExpenses },
+      { path: '/operatorSalary', name: 'Operator Salary', element: OperatorSalary },
+
 
     ]
   }

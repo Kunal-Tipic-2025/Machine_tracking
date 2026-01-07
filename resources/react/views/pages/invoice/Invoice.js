@@ -67,6 +67,9 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
   const [workTypes, setWorkTypes] = useState([]);
 
+  //FILTER for logs
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+
   const [form, setForm] = useState({
     projectId: null,
     customer_id: null,
@@ -395,6 +398,40 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
     setAllProjects([])
     filterMachinesByProject(project)
   }
+
+  // Filter logs based on search query
+  const searchFilteredLogs = useMemo(() => {
+    if (!logSearchQuery.trim()) return filteredLogs;
+
+    const query = logSearchQuery.toLowerCase();
+
+    return filteredLogs.filter((log) => {
+      // Search in work type
+      const workType = workTypeMap[log.work_type_id]?.toLowerCase() || '';
+
+      // Search in operator name
+      const operator = operators.find((op) => op.id == log.operator_id);
+      const operatorName = operator?.name?.toLowerCase() || '';
+
+      // Search in machine name
+      const machineName = getMachineName(log.machine_id).toLowerCase();
+
+      // Search in mode
+      const modeMatch = prices.find((p) => p.id === Number(log.mode_id));
+      const modeName = modeMatch?.mode?.toLowerCase() || '';
+
+      // Search in date
+      const workDate = String(log.work_date).slice(0, 10);
+
+      return (
+        workType.includes(query) ||
+        operatorName.includes(query) ||
+        machineName.includes(query) ||
+        modeName.includes(query) ||
+        workDate.includes(query)
+      );
+    });
+  }, [filteredLogs, logSearchQuery, workTypeMap, operators, getMachineName, prices]);
 
   const clearProject = () => {
     setForm((prev) => ({
@@ -941,12 +978,47 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
               {filteredLogs.length > 0 && (
                 <div className="mt-1">
-                  <h6 className="fw-semibold mb-3">
+                  {/* <h6 className="fw-semibold mb-3">
                     Project Logs (Total : {filteredLogs.length}) |
                     <span className="text-primary ms-2">
                       Selected: {selectedLogIds.length}
                     </span>
-                  </h6>
+                  </h6> */}
+
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h6 className="fw-semibold mb-0">
+                      Project Logs (Total: {filteredLogs.length}) |
+                      <span className="text-primary ms-2">
+                        Showing: {searchFilteredLogs.length}
+                      </span> |
+                      <span className="text-success ms-2">
+                        Selected: {selectedLogIds.length}
+                      </span>
+                    </h6>
+
+                    <div style={{ width: '300px' }}>
+                      <CInputGroup size="sm">
+                        <CInputGroupText>
+                          <CIcon icon={cilSearch} />
+                        </CInputGroupText>
+                        <CFormInput
+                          type="text"
+                          placeholder="Search by operator, work type, machine, mode..."
+                          value={logSearchQuery}
+                          onChange={(e) => setLogSearchQuery(e.target.value)}
+                        />
+                        {logSearchQuery && (
+                          <CButton
+                            color="secondary"
+                            variant="outline"
+                            onClick={() => setLogSearchQuery('')}
+                          >
+                            <CIcon icon={cilX} />
+                          </CButton>
+                        )}
+                      </CInputGroup>
+                    </div>
+                  </div>
                   <div
                     className="table-container"
                     style={{
@@ -979,12 +1051,27 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                       >
                         <tr>
                           <th style={{ width: '50px' }} className="text-center align-middle">
-                            <input
+                            {/* <input
                               type="checkbox"
                               checked={selectedLogIds.length === filteredLogs.length && selectedLogIds.length > 0}
                               onChange={(e) => {
                                 const isChecked = e.target.checked
                                 setSelectedLogIds(isChecked ? filteredLogs.map((l) => l.id) : [])
+                              }}
+                            /> */}
+                            <input
+                              type="checkbox"
+                              checked={
+                                searchFilteredLogs.length > 0 &&
+                                searchFilteredLogs.every((l) => selectedLogIds.includes(l.id))
+                              }
+                              onChange={(e) => {
+                                const isChecked = e.target.checked
+                                setSelectedLogIds(
+                                  isChecked
+                                    ? [...new Set([...selectedLogIds, ...searchFilteredLogs.map((l) => l.id)])]
+                                    : selectedLogIds.filter((id) => !searchFilteredLogs.map((l) => l.id).includes(id))
+                                )
                               }}
                             />
                           </th>
@@ -1008,7 +1095,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredLogs.map((l, idx) => {
+                        {searchFilteredLogs.map((l, idx) => {
                           const start = Number(l.machine_start ?? l.start_reading ?? 0) || 0
                           const end = Number(l.machine_end ?? l.end_reading ?? 0) || 0
                           const total =
@@ -1093,7 +1180,8 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
                         {/* Grand Total Row */}
                         {selectedLogIds.length > 0 && (() => {
-                          const totalNetReading = filteredLogs
+                          // const totalNetReading = filteredLogs
+                          const totalNetReading = searchFilteredLogs
                             .filter((l) => selectedLogIds.includes(l.id))
                             .reduce((acc, l) => {
                               const start = Number(l.machine_start ?? l.start_reading ?? 0) || 0
@@ -1105,7 +1193,8 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                               return acc + total
                             }, 0)
 
-                          const totalAmount = filteredLogs
+                          // const totalAmount = filteredLogs
+                          const totalAmount = searchFilteredLogs
                             .filter((l) => selectedLogIds.includes(l.id))
                             .reduce((acc, l) => {
                               const start = Number(l.machine_start ?? l.start_reading ?? 0) || 0
