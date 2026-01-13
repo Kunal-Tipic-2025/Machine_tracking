@@ -47,6 +47,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\MachineryController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\BudgetController;
+use App\Http\Controllers\InvoiceAdditionalChargeController;
 use App\Http\Controllers\ProjectSummaryController;
 
 use App\Http\Controllers\VendorPaymentController;
@@ -181,6 +182,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
 
     // Trends and Analytics
     Route::get('/dashboard/monthly-trends', [TipicAdminDashboardController::class, 'getMonthlyTrends']);
+
 });
 Route::put('/projects/{id}/paidamount', [ProjectController::class, 'updatePaidAmount']);
 
@@ -278,7 +280,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/advances/settle', [AdvanceController::class, 'settle']);
     Route::get('/advances/settle', [AdvanceController::class, 'settledAdvanceHistory']);
     Route::get('/advances/repaid-unsettled', [AdvanceController::class, 'repaidButUnsettled']);
-Route::get('/expenses/pending', [ExpenseController::class, 'pending']);
+    Route::get('/expenses/pending', [ExpenseController::class, 'pending']);
+
+
+    //Additional chnages for invoice creation
+    Route::post('/invoice-additional-charges/bulk', [InvoiceAdditionalChargeController::class, 'storeBulk']);
+    Route::get('/invoice-additional-charges/{invoiceId}', [InvoiceAdditionalChargeController::class, 'getByInvoice']);
+    Route::put('/invoice-additional-charges/{id}', [InvoiceAdditionalChargeController::class, 'update']);
+    Route::delete('/invoice-additional-charges/{id}', [InvoiceAdditionalChargeController::class, 'destroy']);
+    Route::put('/invoice-additional-charges/{id}/paid-amount', [InvoiceAdditionalChargeController::class, 'updatePaidAmount']);
+    // Route::post('/invoice-additional-charges/auto-settle', [InvoiceAdditionalChargeController::class, 'autoSettleByInvoice']); //bulk settlement
+
 
     // _____________________________________________________________________________________________________________________ 
     // Admin Dashboard Routes
@@ -303,7 +315,10 @@ Route::get('/expenses/pending', [ExpenseController::class, 'pending']);
     });
 });
 
-
+Route::middleware('auth:sanctum')->post(
+    '/invoice-additional-charges/auto-settle',
+    [InvoiceAdditionalChargeController::class, 'autoSettleByInvoice']
+);
 
 Route::apiResource('partner-types', OnboardingPartnerTypeController::class);
 

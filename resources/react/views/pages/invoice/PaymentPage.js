@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { getAPICall, postAPICall, postFormData } from '../../../util/api'; // Assuming the same utility as in Invoice component
+import { getAPICall, post, postAPICall, postFormData } from '../../../util/api'; // Assuming the same utility as in Invoice component
 import { useToast } from '../../common/toast/ToastContext'; // Assuming ToastContext is available
 import { useNavigate } from 'react-router-dom'
 import { CButton, CFormSelect, CSpinner } from '@coreui/react';
@@ -35,7 +35,39 @@ const PaymentPage = () => {
     const [modalPaymentMode, setModalPaymentMode] = useState('Cash');
     const [modalRemark, setModalRemark] = useState('');
 
+
+
+    //Additional changes 
+    const [additionalCharges, setAdditionalCharges] = useState([]);
+    const [editingChargeId, setEditingChargeId] = useState(null);
+    const [editingChargeAmount, setEditingChargeAmount] = useState('');
+
+    // const fetchAdditionalCharges = async () => {
+    //     try {
+    //         const res = await getAPICall(`/api/invoice-additional-charges/${id}`);
+    //         setAdditionalCharges(res || []);
+    //     } catch (err) {
+    //         console.error('Failed to fetch additional charges', err);
+    //         showToast('danger', 'Failed to load additional charges');
+    //     }
+    // };
+
     //Adding work type
+
+    const fetchAdditionalCharges = async (invoiceNumber) => {
+        if (!invoiceNumber) return;
+
+        try {
+            const res = await getAPICall(
+                `/api/invoice-additional-charges/${invoiceNumber}`
+            );
+            setAdditionalCharges(res || []);
+        } catch (err) {
+            console.error('Failed to fetch additional charges', err);
+            showToast('danger', 'Failed to load additional charges');
+        }
+    };
+
     const [workTypes, setWorkTypes] = useState([]);
     useEffect(() => {
         const fetchWorkTypes = async () => {
@@ -155,6 +187,18 @@ const PaymentPage = () => {
         fetchPaymentData();
     }, [id]);
 
+    // useEffect(() => {
+    //     if (id) {
+    //         fetchAdditionalCharges();
+    //     }
+    // }, [id]);
+
+    useEffect(() => {
+        if (response?.invoice_number) {
+            fetchAdditionalCharges(response.invoice_number);
+        }
+    }, [response?.invoice_number]);
+
 
     //here now
     const [machineLogs, setMachineLogs] = useState([]);
@@ -162,6 +206,54 @@ const PaymentPage = () => {
     const [operators, setOperators] = useState([]);
     const [prices, setPrice] = useState([]);
     const [ci, setCi] = useState(null);
+
+
+
+    const additionalTotal = additionalCharges.reduce(
+        (sum, c) => sum + Number(c.amount || 0),
+        0
+    );
+
+    const grandTotal = (Number(response?.total) || 0);
+    // const grandTotal = (Number(response?.total) || 0) + additionalTotal;
+
+    const startEditCharge = (charge) => {
+        setEditingChargeId(charge.id);
+        setEditingChargeAmount(String(charge.amount));
+    };
+
+    const cancelEditCharge = () => {
+        setEditingChargeId(null);
+        setEditingChargeAmount('');
+    };
+
+    const saveEditCharge = async (charge) => {
+        const newAmount = Number(editingChargeAmount);
+
+        if (isNaN(newAmount) || newAmount < 0) {
+            showToast('danger', 'Enter valid amount');
+            return;
+        }
+
+        try {
+            await fetch(`/api/invoice-additional-charges/${charge.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: newAmount }),
+            });
+
+            setAdditionalCharges(prev =>
+                prev.map(c => c.id === charge.id ? { ...c, amount: newAmount } : c)
+            );
+
+            setEditingChargeId(null);
+            setEditingChargeAmount('');
+            showToast('success', 'Additional charge updated');
+        } catch (err) {
+            console.error(err);
+            showToast('danger', 'Failed to update charge');
+        }
+    };
 
     useEffect(() => {
         const fetchMachineLogs = async () => {
@@ -312,7 +404,9 @@ const PaymentPage = () => {
 
     const calculateTotals = () => {
         // const totalAmount = machineLogData.reduce((acc, log) => acc + log.total_price, 0);
-        const remainingAmount = response?.total - formData.amountPaid;
+        // const remainingAmount = response?.total - formData.amountPaid;
+        const remainingAmount = grandTotal - formData.amountPaid;
+
         // const totalNetReading = machineLogData.reduce((acc, log) => acc + log.net_reading, 0);
         return { remainingAmount };
     };
@@ -323,10 +417,17 @@ const PaymentPage = () => {
 
     const handleSave = async () => {
 
+        const logsTotal = response?.total || 0;
+        const paymentEntered = Number(formData.amountPaid || 0);
+
+        // 👇 THIS IS THE KEY
+        const paidForLogs = Math.min(paymentEntered, logsTotal);
+        const leftoverForExtras = Math.max(0, paymentEntered - logsTotal);
+
         try {
 
             const updatedData = {
-                paid_amount: formData.amountPaid,  // or whatever field you have
+                paid_amount: paidForLogs,
                 payment_mode: formData.paymentMode?.trim() || 'Cash',
             };
 
@@ -358,10 +459,10 @@ const PaymentPage = () => {
             company_id: response.company_id,
             project_id: response.project?.id,
             invoice_id: response?.invoice_number,
-            payment: formData?.amountPaid,
+            payment: paidForLogs,
             total: response.total,
-            remaining: response.total - formData?.amountPaid,
-            is_completed: response.total - formData?.amountPaid <= 0,
+            remaining: response.total - paidForLogs,
+            is_completed: response.total - paidForLogs <= 0,
             date: today,
             remark: formData?.modalRemark,
         };
@@ -375,11 +476,47 @@ const PaymentPage = () => {
                 body: JSON.stringify(payload),
             });
 
+            // const extraAfterLogs = grandTotal - formData.amountPaid;
+
+            // if (extraAfterLogs > 0 && additionalCharges.length > 0) {
+            //     await fetch('/api/invoice-additional-charges/auto-settle', {
+            //         method: 'POST',
+            //         headers: { 'Content-Type': 'application/json' },
+            //         body: JSON.stringify({
+            //             invoice_id: response.invoice_number,
+            //             payable_amount: extraAfterLogs, // IMPORTANT: remaining after logs
+            //         }),
+            //     });
+
+            //     showToast('success', 'Additional charges adjusted');
+            // }
+
+            if (leftoverForExtras > 0 && additionalCharges.length > 0) {
+                // await fetch('/api/invoice-additional-charges/auto-settle', {
+                //     method: 'POST',
+                //     headers: { 'Content-Type': 'application/json',
+                //         'Accept': 'application/json', 
+                //      },
+                //        credentials: 'include',
+                //     body: JSON.stringify({
+                //         invoice_id: response.invoice_number,
+                //         payable_amount: leftoverForExtras, // ✅ ONLY leftover
+                //     }),
+                // });
+                const data = { invoice_id: response.invoice_number,
+                        payable_amount: leftoverForExtras}
+                await post('/api/invoice-additional-charges/auto-settle',data);
+                showToast('success', 'Additional charges adjusted');
+            }
+
             const data = await res.json();
             console.log("✅ Repayment created:", data);
         } catch (err) {
             console.error("❌ Error creating repayment:", err);
         }
+
+
+
 
     };
 
@@ -518,6 +655,7 @@ const PaymentPage = () => {
                 remark: response.remark || '', // ✅ Pass Remark/Description
                 transaction_id: response.transaction_id || '', // ✅ Pass Transaction ID
                 totalAmount: response.total || 0, // ✅ Pass Total Amount
+                additionalCharges: additionalCharges || [],
             };
 
             showToast('success', 'Payment data loaded successfully');
@@ -885,11 +1023,88 @@ const PaymentPage = () => {
                                                 }, 0).toFixed(2)}
                                             </CTableDataCell>
                                             <CTableDataCell colSpan={1}></CTableDataCell>
-                                            <CTableDataCell className="text-end">₹{response?.total ?? 0}</CTableDataCell>
+                                            <CTableDataCell className="text-end">₹{response?.base_total ?? 0}</CTableDataCell>
                                         </CTableRow>
                                     </CTableBody>
                                 </CTable>
                             </div>
+                        </div>
+                    )}
+
+
+                    {/* Additional charges table  */}
+                    {additionalCharges.length > 0 && (
+                        <div className="section mt-3">
+                            <h6 className="fw-bold mb-2">Additional Charges</h6>
+
+                            <CTable bordered small>
+                                <CTableHead className="table-light">
+                                    <CTableRow>
+                                        <CTableHeaderCell>Type</CTableHeaderCell>
+                                        <CTableHeaderCell>Amount</CTableHeaderCell>
+                                        {/* <CTableHeaderCell style={{ width: '120px' }}>Action</CTableHeaderCell> */}
+                                    </CTableRow>
+                                </CTableHead>
+
+                                <CTableBody>
+                                    {additionalCharges.map((c) => (
+                                        <CTableRow key={c.id}>
+                                            <CTableDataCell>
+                                                {c.charge_type.replace('_', ' ').toUpperCase()}
+                                            </CTableDataCell>
+
+                                            <CTableDataCell>
+                                                {editingChargeId === c.id ? (
+                                                    <input
+                                                        type="number"
+                                                        className="form-control form-control-sm"
+                                                        value={editingChargeAmount}
+                                                        min="0"
+                                                        onChange={(e) => setEditingChargeAmount(e.target.value)}
+                                                    />
+                                                ) : (
+                                                    <>₹{Number(c.amount).toFixed(2)}</>
+                                                )}
+                                            </CTableDataCell>
+
+                                            {/* <CTableDataCell>
+                                                {editingChargeId === c.id ? (
+                                                    <>
+                                                        <CButton size="sm" color="success" onClick={() => saveEditCharge(c)}>
+                                                            Save
+                                                        </CButton>
+                                                        <CButton
+                                                            size="sm"
+                                                            color="secondary"
+                                                            variant="outline"
+                                                            className="ms-1"
+                                                            onClick={cancelEditCharge}
+                                                        >
+                                                            Cancel
+                                                        </CButton>
+                                                    </>
+                                                ) : (
+                                                    <CButton size="sm" color="info" onClick={() => startEditCharge(c)}>
+                                                        Edit
+                                                    </CButton>
+                                                )}
+                                            </CTableDataCell> */}
+                                        </CTableRow>
+                                    ))}
+
+                                    {/* Charges Total */}
+                                    <CTableRow className="table-secondary fw-bold">
+                                        <CTableDataCell className="text-end" colSpan={1}>
+                                            Total
+                                        </CTableDataCell>
+                                        <CTableDataCell colSpan={2}>
+                                            ₹{additionalCharges
+                                                .reduce((sum, c) => sum + Number(c.amount || 0), 0)
+                                                .toFixed(2)}
+                                        </CTableDataCell>
+                                    </CTableRow>
+                                </CTableBody>
+                            </CTable>
                         </div>
                     )}
 
@@ -907,7 +1122,8 @@ const PaymentPage = () => {
                                                 Total Amount:
                                             </CTableDataCell>
                                             <CTableDataCell className="py-1 text-start">
-                                                ₹{response.total}
+                                                {/* ₹{response.total  } */}
+                                                ₹{response.total }
                                             </CTableDataCell>
                                         </CTableRow>
                                     </>

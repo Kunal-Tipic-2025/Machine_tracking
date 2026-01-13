@@ -108,40 +108,66 @@ class OperatorReportDashboardController extends Controller
     //salary history of operator
     public function salaryHistory(Request $request)
     {
+        // $request->validate([
+        //     'operator_id' => 'required|integer|exists:users,id',
+        //     'company_id'  => 'required|integer',
+        //     'month'       => 'nullable|string|size:7',
+        //     'from_date'   => 'nullable|date',
+        //     'to_date'     => 'nullable|date',
+        // ]);
+
+        // $query = SalaryPayment::where('operator_id', $request->operator_id)
+        //     ->where('company_id', $request->company_id)
+        //     ->with([
+        //         'advances:id,operator_id,amount,repayment_amount,settled_in_salary_id',
+        //         'expenses:id,operator_id,total_amount,settled_in_salary_id'
+        //     ])
+        //     ->orderBy('month', 'desc');
+
+        // // Optional filters
+        // if ($request->month) {
+        //     $query->where('month', $request->month);
+        // }
+
+        // if ($request->from_date && $request->to_date) {
+        //     $query->whereBetween('paid_at', [
+        //         $request->from_date,
+        //         $request->to_date
+        //     ]);
+        // }
+
+        // $salaryHistory = $query->paginate(10);
+
+        // return response()->json([
+        //     'operator' => User::select('id', 'name', 'mobile')
+        //         ->find($request->operator_id),
+        //     'salary_history' => $salaryHistory
+        // ]);
+
+         // 1️⃣ Validate request
         $request->validate([
             'operator_id' => 'required|integer|exists:users,id',
             'company_id'  => 'required|integer',
-            'month'       => 'nullable|string|size:7',
-            'from_date'   => 'nullable|date',
-            'to_date'     => 'nullable|date',
         ]);
 
-        $query = SalaryPayment::where('operator_id', $request->operator_id)
+        // 2️⃣ Fetch salary history
+        $salaryHistory = SalaryPayment::where('operator_id', $request->operator_id)
             ->where('company_id', $request->company_id)
-            ->with([
-                'advances:id,operator_id,amount,repayment_amount,settled_in_salary_id',
-                'expenses:id,operator_id,total_amount,settled_in_salary_id'
-            ])
-            ->orderBy('month', 'desc');
-
-        // Optional filters
-        if ($request->month) {
-            $query->where('month', $request->month);
-        }
-
-        if ($request->from_date && $request->to_date) {
-            $query->whereBetween('paid_at', [
-                $request->from_date,
-                $request->to_date
+            ->orderBy('month', 'desc')
+            ->get([
+                'id',
+                'month',
+                'base_salary',
+                'total_advance_deducted',
+                'total_expense_deducted',
+                'net_salary',
+                'paid_at',
+                'remark',
             ]);
-        }
 
-        $salaryHistory = $query->paginate(10);
-
+        // 3️⃣ Response
         return response()->json([
-            'operator' => User::select('id', 'name', 'mobile')
-                ->find($request->operator_id),
-            'salary_history' => $salaryHistory
+            'salary_history' => $salaryHistory,
         ]);
     }
 }

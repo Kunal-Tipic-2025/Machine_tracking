@@ -215,7 +215,7 @@ export default function fetchNavItems(t1) {
            {
             component: CNavItem,
             // name: t("LABELS.project_report"),
-            name: t("Operator Report"),
+            name: t("Operator Salary"),
             to: '/operatorSalary',
             className: 'ms-2',
 

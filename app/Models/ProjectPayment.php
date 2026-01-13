@@ -79,4 +79,9 @@ class ProjectPayment extends Model
     {
         return $this->hasMany(Repayment::class, 'invoice_id');
     }
+
+    public function additionalCharges()
+{
+    return $this->hasMany(InvoiceAdditionalCharge::class, 'invoice_id', 'invoice_number');
+}
 }

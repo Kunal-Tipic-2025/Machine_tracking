@@ -152,6 +152,78 @@ class RepaymentController extends Controller
 
 
 
+    // public function store(Request $request)
+    // {
+    //     $user = Auth::user();
+    //     $companyId = $user->company_id;
+
+    //     $validated = $request->validate([
+    //         'project_id' => 'required|integer|exists:projects,id',
+    //         'payment' => 'required|numeric|min:0',
+    //     ]);
+
+    //     $paymentAmount = $validated['payment'];
+
+    //     // Fetch all invoices for this project & company, oldest first
+    //     $invoices = ProjectPayment::where('company_id', $companyId)
+    //         ->where('project_id', $validated['project_id'])
+    //         ->orderBy('created_at', 'asc')
+    //         ->get();
+
+    //     if ($invoices->isEmpty()) {
+    //         return response()->json([
+    //             'message' => 'No project payments found for this project under this company.'
+    //         ], 404);
+    //     }
+
+    //     $repayments = [];
+
+    //     foreach ($invoices as $invoice) {
+    //         // Calculate remaining amount for this invoice
+    //         $invoiceRemaining = $invoice->total - $invoice->paid_amount;
+
+    //         if ($invoiceRemaining <= 0) {
+    //             continue; // Skip fully paid invoices
+    //         }
+
+    //         // Payment to apply on this invoice
+    //         $applyPayment = min($paymentAmount, $invoiceRemaining);
+
+    //         // Create repayment record
+    //         $repaymentData = [
+    //             'company_id' => $companyId,
+    //             'project_id' => $validated['project_id'],
+    //             'invoice_id' => $invoice->invoice_number,
+    //             'payment' => $applyPayment,
+    //             'total' => $invoiceRemaining,
+    //             'remaining' => $invoiceRemaining - $applyPayment,
+    //             'is_completed' => ($applyPayment >= $invoiceRemaining),
+    //             'date' => Carbon::now()->toDateString(),
+    //         ];
+
+    //         $repayment = Repayment::create($repaymentData);
+    //         $repayments[] = $repayment;
+
+    //         // Update invoice paid_amount
+    //         $invoice->paid_amount += $applyPayment;
+    //         $invoice->save();
+
+    //         // Reduce remaining payment
+    //         $paymentAmount -= $applyPayment;
+
+    //         // Stop if full payment amount has been allocated
+    //         if ($paymentAmount <= 0) {
+    //             break;
+    //         }
+    //     }
+
+    //     return response()->json([
+    //         'message' => 'Repayment(s) created successfully',
+    //         'data' => $repayments
+    //     ], 201);
+    // }
+
+
     public function store(Request $request)
     {
         $user = Auth::user();
@@ -159,68 +231,162 @@ class RepaymentController extends Controller
 
         $validated = $request->validate([
             'project_id' => 'required|integer|exists:projects,id',
-            'payment' => 'required|numeric|min:0',
+            'payment' => 'required|numeric|min:0.01',
+            'payment_mode' => 'nullable|string',
         ]);
 
-        $paymentAmount = $validated['payment'];
+        $incomingPayment = (float) $validated['payment'];
 
-        // Fetch all invoices for this project & company, oldest first
-        $invoices = ProjectPayment::where('company_id', $companyId)
-            ->where('project_id', $validated['project_id'])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        DB::beginTransaction();
 
-        if ($invoices->isEmpty()) {
+        try {
+            // 1️⃣ Fetch invoices (oldest first)
+            $invoices = ProjectPayment::where('company_id', $companyId)
+                ->where('project_id', $validated['project_id'])
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            if ($invoices->isEmpty()) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'No invoices found for this project.'
+                ], 404);
+            }
+
+            // 2️⃣ Calculate TOTAL outstanding BEFORE mutation
+            $totalOutstanding = 0;
+
+            foreach ($invoices as $invoice) {
+                $invoiceRemaining = max(0, $invoice->total - $invoice->paid_amount);
+                $totalOutstanding += $invoiceRemaining;
+
+                $chargesOutstanding = \App\Models\InvoiceAdditionalCharge::where(
+                    'invoice_id',
+                    $invoice->invoice_number
+                )->sum(DB::raw('amount - IFNULL(paid_amount, 0)'));
+
+                $totalOutstanding += max(0, $chargesOutstanding);
+            }
+
+            // 3️⃣ Reject overpayment
+            if ($incomingPayment > $totalOutstanding) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment exceeds total outstanding balance',
+                    'details' => [
+                        'incoming_payment' => $incomingPayment,
+                        'total_outstanding' => $totalOutstanding,
+                        'excess_amount' => round($incomingPayment - $totalOutstanding, 2)
+                    ]
+                ], 422);
+            }
+
+            $remainingPayment = $incomingPayment;
+            $repayments = [];
+
+            // 4️⃣ Allocate payment invoice by invoice
+            foreach ($invoices as $invoice) {
+
+                if ($remainingPayment <= 0)
+                    break;
+
+                /** -------------------------------
+                 *  A. Settle INVOICE amount
+                 * ------------------------------- */
+                $invoiceRemaining = max(0, $invoice->total - $invoice->paid_amount);
+
+                if ($invoiceRemaining > 0) {
+                    $invoicePayment = min($invoiceRemaining, $remainingPayment);
+
+                    Repayment::create([
+                        'company_id' => $companyId,
+                        'project_id' => $validated['project_id'],
+                        'invoice_id' => $invoice->invoice_number,
+                        'payment' => $invoicePayment,
+                        'total' => $invoiceRemaining,
+                        'remaining' => $invoiceRemaining - $invoicePayment,
+                        'is_completed' => ($invoicePayment >= $invoiceRemaining),
+                        'payment_mode' => $validated['payment_mode'] ?? null,
+                        'date' => now()->toDateString(),
+                    ]);
+
+                    $invoice->paid_amount += $invoicePayment;
+                    $invoice->save();
+
+                    $remainingPayment -= $invoicePayment;
+                }
+
+                if ($remainingPayment <= 0)
+                    break;
+
+                /** ---------------------------------
+                 *  B. Settle ADDITIONAL CHARGES
+                 * --------------------------------- */
+                $charges = \App\Models\InvoiceAdditionalCharge::where(
+                    'invoice_id',
+                    $invoice->invoice_number
+                )->orderBy('id', 'asc')->get();
+
+                foreach ($charges as $charge) {
+                    if ($remainingPayment <= 0)
+                        break;
+
+                    $chargeRemaining = max(
+                        0,
+                        $charge->amount - ($charge->paid_amount ?? 0)
+                    );
+
+                    if ($chargeRemaining <= 0)
+                        continue;
+
+                    $chargePayment = min($chargeRemaining, $remainingPayment);
+
+                    Repayment::create([
+                        'company_id' => $companyId,
+                        'project_id' => $validated['project_id'],
+                        'invoice_id' => $invoice->invoice_number,
+                        'charge_id' => $charge->id,
+                        'payment' => $chargePayment,
+                        'total' => $chargeRemaining,
+                        'remaining' => $chargeRemaining - $chargePayment,
+                        'is_completed' => ($chargePayment >= $chargeRemaining),
+                        'payment_mode' => $validated['payment_mode'] ?? null,
+                        'date' => now()->toDateString(),
+                    ]);
+
+                    $charge->paid_amount += $chargePayment;
+                    $charge->is_paid = ($charge->paid_amount >= $charge->amount);
+                    $charge->save();
+
+                    $remainingPayment -= $chargePayment;
+                }
+            }
+
+            DB::commit();
+
             return response()->json([
-                'message' => 'No project payments found for this project under this company.'
-            ], 404);
+                'success' => true,
+                'message' => 'Payment allocated successfully',
+                'data' => [
+                    'incoming_payment' => $incomingPayment,
+                    'total_allocated' => $incomingPayment - $remainingPayment,
+                    'remaining_unused' => round($remainingPayment, 2),
+                ]
+            ], 201);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Project repayment failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process payment'
+            ], 500);
         }
-
-        $repayments = [];
-
-        foreach ($invoices as $invoice) {
-            // Calculate remaining amount for this invoice
-            $invoiceRemaining = $invoice->total - $invoice->paid_amount;
-
-            if ($invoiceRemaining <= 0) {
-                continue; // Skip fully paid invoices
-            }
-
-            // Payment to apply on this invoice
-            $applyPayment = min($paymentAmount, $invoiceRemaining);
-
-            // Create repayment record
-            $repaymentData = [
-                'company_id' => $companyId,
-                'project_id' => $validated['project_id'],
-                'invoice_id' => $invoice->invoice_number,
-                'payment' => $applyPayment,
-                'total' => $invoiceRemaining,
-                'remaining' => $invoiceRemaining - $applyPayment,
-                'is_completed' => ($applyPayment >= $invoiceRemaining),
-                'date' => Carbon::now()->toDateString(),
-            ];
-
-            $repayment = Repayment::create($repaymentData);
-            $repayments[] = $repayment;
-
-            // Update invoice paid_amount
-            $invoice->paid_amount += $applyPayment;
-            $invoice->save();
-
-            // Reduce remaining payment
-            $paymentAmount -= $applyPayment;
-
-            // Stop if full payment amount has been allocated
-            if ($paymentAmount <= 0) {
-                break;
-            }
-        }
-
-        return response()->json([
-            'message' => 'Repayment(s) created successfully',
-            'data' => $repayments
-        ], 201);
     }
 
     // Create an advance payment: generate an invoice with payment_mode "Advance"

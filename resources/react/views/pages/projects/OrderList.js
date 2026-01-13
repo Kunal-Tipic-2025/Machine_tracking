@@ -32,6 +32,9 @@ const OrderList = ({ projectId, inModal = false }) => {
     const [downloadingInvoicePDF, setDownloadingInvoicePDF] = useState(false);
 
 
+    const [additionalCharges, setAdditionalCharges] = useState([]);
+
+
     //Work type
     const [workTypes, setWorkTypes] = useState([]);
     useEffect(() => {
@@ -83,12 +86,33 @@ const OrderList = ({ projectId, inModal = false }) => {
         }
     }, [orders, logs]);
 
+    // const fetchOrders = async () => {
+    //     try {
+    //         setLoading(true);
+    //         const response = await getAPICall(`/api/project-payments/${projectId}`);
+    //         console.log(response);
+    //         setOrders(response);
+    //     } catch (error) {
+    //         console.error('Error fetching orders:', error);
+    //         showAlert('Failed to fetch orders', 'danger');
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // };
+
     const fetchOrders = async () => {
         try {
             setLoading(true);
             const response = await getAPICall(`/api/project-payments/${projectId}`);
             console.log(response);
             setOrders(response);
+
+            // Fetch additional charges using invoice_number
+            if (response?.invoice_number) {
+                const chargesResp = await getAPICall(`/api/invoice-additional-charges/${response.invoice_number}`);
+                setAdditionalCharges(chargesResp || []);
+                console.log('Additional Charges:', chargesResp);
+            }
         } catch (error) {
             console.error('Error fetching orders:', error);
             showAlert('Failed to fetch orders', 'danger');
@@ -169,15 +193,42 @@ const OrderList = ({ projectId, inModal = false }) => {
             }
 
             const invoiceDate = formatDate(orders.created_at);
+
             // Map orders data to formData expected by generateMultiLanguagePDF
+            // const formData = {
+            //     invoice_number: orders.invoice_number,
+            //     date: invoiceDate,
+            //     customer: {
+            //         name: orders.project?.customer_name || 'N/A',
+            //         address: orders.project?.work_place || '', // Assuming work_place as address for now, or fetch if available
+            //         mobile: orders.project?.mobile_number || '',
+            //         gst_number: orders.project?.gst_number || '', // If available in project
+            //     },
+            //     consignee: {
+            //         name: ci.company_name,
+            //         address: `${ci.land_mark || ''}, ${ci.Tal || ''}, ${ci.Dist || ''}, ${ci.pincode || ''}`,
+            //         phone_no: ci.phone_no,
+            //         gst_number: ci.gst_number,
+            //         email_id: ci.email_id,
+            //     },
+            //     totalAmount: orders.total,
+            //     amountPaid: orders.paid_amount,
+            //     finalAmount: orders.total, // Assuming final amount is total
+            //     paymentMode: orders.payment_mode,
+            //     transaction_id: orders.transaction_id,
+            //     is_fixed_bid: orders.is_fixed_bid == 1,
+            //     is_advance: orders.is_advance == 1,
+            //     remark: orders.remark, // For fixed bid/advance
+            // };
+
             const formData = {
                 invoice_number: orders.invoice_number,
                 date: invoiceDate,
                 customer: {
                     name: orders.project?.customer_name || 'N/A',
-                    address: orders.project?.work_place || '', // Assuming work_place as address for now, or fetch if available
+                    address: orders.project?.work_place || '',
                     mobile: orders.project?.mobile_number || '',
-                    gst_number: orders.project?.gst_number || '', // If available in project
+                    gst_number: orders.project?.gst_number || '',
                 },
                 consignee: {
                     name: ci.company_name,
@@ -186,14 +237,17 @@ const OrderList = ({ projectId, inModal = false }) => {
                     gst_number: ci.gst_number,
                     email_id: ci.email_id,
                 },
-                totalAmount: orders.total,
-                amountPaid: orders.paid_amount,
-                finalAmount: orders.total, // Assuming final amount is total
+                totalAmount: grandTotal,  // ✅ Use calculated grandTotal
+                amountPaid: totalPaidAmount,  // ✅ Use calculated totalPaidAmount
+                finalAmount: grandTotal,  // ✅ Use calculated grandTotal
+                baseTotal: baseTotal,  // ✅ NEW: Work orders subtotal
+                additionalChargesTotal: additionalChargesTotal,  // ✅ NEW: Additional charges total
+                additionalCharges: additionalCharges,  // ✅ NEW: Full additional charges array for PDF
                 paymentMode: orders.payment_mode,
                 transaction_id: orders.transaction_id,
                 is_fixed_bid: orders.is_fixed_bid == 1,
                 is_advance: orders.is_advance == 1,
-                remark: orders.remark, // For fixed bid/advance
+                remark: orders.remark,
             };
 
             // Wrap logs to match expected structure { data: log }
@@ -226,6 +280,15 @@ const OrderList = ({ projectId, inModal = false }) => {
         return new Date(dateStr).toLocaleDateString('en-GB');
     };
 
+    const formatChargeType = (chargeType) => {
+        const chargeTypeMap = {
+            'travelling_charge': 'Travelling Charges',
+            'service_charge': 'Service Charges',
+            'other_charge': 'Other Charges'
+        };
+        return chargeTypeMap[chargeType] || chargeType;
+    };
+
     if (loading) {
         return (
             <div className="d-flex justify-content-center align-items-center p-5">
@@ -242,7 +305,26 @@ const OrderList = ({ projectId, inModal = false }) => {
         );
     }
 
-    const remaining = orders?.total - orders?.paid_amount;
+    // const remaining = orders?.total - orders?.paid_amount;
+    // const isCompleted = remaining <= 0;
+
+    // Calculate additional charges totals
+    const additionalChargesTotal = additionalCharges.reduce((sum, charge) =>
+        sum + Number(charge.amount || 0), 0
+    );
+
+    const additionalChargesPaid = additionalCharges.reduce((sum, charge) =>
+        sum + Number(charge.paid_amount || 0), 0
+    );
+
+    // Calculate grand total including additional charges
+    const baseTotal = Number(orders?.base_total || 0);
+    const basePaid = Number(orders?.paid_amount || 0);
+
+    const grandTotal = baseTotal + additionalChargesTotal;
+    const totalPaidAmount = basePaid + additionalChargesPaid;
+    const remaining = grandTotal - totalPaidAmount;
+
     const isCompleted = remaining <= 0;
 
     return (
@@ -440,8 +522,41 @@ const OrderList = ({ projectId, inModal = false }) => {
                                         </CTableDataCell>
                                     </CTableRow>
                                 )}
+                                {/* Additional Charges Section */}
+                                {additionalCharges && additionalCharges.length > 0 && (
+                                    <>
+                                        <CTableRow style={{ backgroundColor: '#f0f8ff' }}>
+                                            <CTableDataCell colSpan={11} className="fw-bold text-primary">
+                                                Additional Charges
+                                            </CTableDataCell>
+                                        </CTableRow>
+                                        {additionalCharges.map((charge, idx) => (
+                                            <CTableRow key={`charge-${charge.id}`} style={{ backgroundColor: '#f8f9fa' }}>
+                                                <CTableDataCell>{filteredLogs.length + idx + 1}</CTableDataCell>
+                                                <CTableDataCell>{charge.date ? new Date(charge.date).toLocaleDateString('en-GB') : '-'}</CTableDataCell>
+                                                <CTableDataCell colSpan={7}>
+                                                    <strong>{formatChargeType(charge.charge_type)}</strong>
+                                                    {charge.remark && (
+                                                        <div className="small text-muted mt-1">
+                                                            Note: {charge.remark}
+                                                        </div>
+                                                    )}
+                                                </CTableDataCell>
+                                                <CTableDataCell className="text-center">
+                                                    <CBadge color={charge.is_paid ? "success" : "warning"}>
+                                                        {charge.is_paid ? "Paid" : "Pending"}
+                                                    </CBadge>
+                                                </CTableDataCell>
+                                                <CTableDataCell className="text-end fw-bold">
+                                                    ₹{Number(charge.amount).toFixed(2)}
+                                                </CTableDataCell>
+                                            </CTableRow>
+                                        ))}
+                                    </>
+                                )}
+
                                 {/* Summary Rows */}
-                                <CTableRow className="fw-bold bg-light">
+                                {/* <CTableRow className="fw-bold bg-light">
                                     <CTableDataCell colSpan={10} className="text-end">
                                         Grand Total
                                     </CTableDataCell>
@@ -449,12 +564,59 @@ const OrderList = ({ projectId, inModal = false }) => {
                                         ₹{Number(orders?.total || 0).toFixed(2)}
                                     </CTableDataCell>
                                 </CTableRow>
+
                                 <CTableRow className="bg-light">
                                     <CTableDataCell colSpan={10} className="text-end">
                                         Paid Amount
                                     </CTableDataCell>
                                     <CTableDataCell className="text-end text-success">
                                         ₹{Number(orders?.paid_amount || 0).toFixed(2)}
+                                    </CTableDataCell>
+                                </CTableRow>
+                                <CTableRow className="fw-bold bg-light">
+                                    <CTableDataCell colSpan={10} className="text-end">
+                                        Remaining Amount
+                                    </CTableDataCell>
+                                    <CTableDataCell className={`text-end ${remaining > 0 ? 'text-danger' : 'text-success'}`}>
+                                        ₹{remaining.toFixed(2)}
+                                    </CTableDataCell>
+                                </CTableRow> */}
+
+                                {/* Summary Rows */}
+                                {additionalCharges.length > 0 && (
+                                    <>
+                                        <CTableRow className="bg-light">
+                                            <CTableDataCell colSpan={10} className="text-end">
+                                                Work Orders Subtotal
+                                            </CTableDataCell>
+                                            <CTableDataCell className="text-end">
+                                                ₹{baseTotal.toFixed(2)}
+                                            </CTableDataCell>
+                                        </CTableRow>
+                                        <CTableRow className="bg-light">
+                                            <CTableDataCell colSpan={10} className="text-end">
+                                                Additional Charges Total
+                                            </CTableDataCell>
+                                            <CTableDataCell className="text-end">
+                                                ₹{additionalChargesTotal.toFixed(2)}
+                                            </CTableDataCell>
+                                        </CTableRow>
+                                    </>
+                                )}
+                                <CTableRow className="fw-bold bg-primary text-white">
+                                    <CTableDataCell colSpan={10} className="text-end">
+                                        Grand Total
+                                    </CTableDataCell>
+                                    <CTableDataCell className="text-end">
+                                        ₹{grandTotal.toFixed(2)}
+                                    </CTableDataCell>
+                                </CTableRow>
+                                <CTableRow className="bg-light">
+                                    <CTableDataCell colSpan={10} className="text-end">
+                                        Paid Amount
+                                    </CTableDataCell>
+                                    <CTableDataCell className="text-end text-success">
+                                        ₹{totalPaidAmount.toFixed(2)}
                                     </CTableDataCell>
                                 </CTableRow>
                                 <CTableRow className="fw-bold bg-light">
@@ -475,17 +637,19 @@ const OrderList = ({ projectId, inModal = false }) => {
                             <CCol md={4}>
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-bold me-2">Total Amount:</span>
-                                    <span className="fs-5 fw-bold">₹{Number(orders?.total || 0).toFixed(2)}</span>
+                                    {/* <span className="fs-5 fw-bold">₹{Number(orders?.total || 0).toFixed(2)}</span> */}
+                                    <span className="fs-5 fw-bold">₹{grandTotal.toFixed(2)}</span>
                                 </div>
                             </CCol>
                             <CCol md={4}>
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-bold me-2">Paid Amount:</span>
-                                    <span className="fs-5 fw-bold text-success">₹{Number(orders?.paid_amount || 0).toFixed(2)}</span>
+                                    {/* <span className="fs-5 fw-bold text-success">₹{Number(orders?.paid_amount || 0).toFixed(2)}</span> */}
+                                    <span className="fs-5 fw-bold text-success">₹{totalPaidAmount.toFixed(2)}</span>
                                 </div>
                             </CCol>
                             <CCol md={4}>
-                                  <div className="d-flex justify-content-between align-items-center mb-2">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
                                     <span className="fw-bold me-2">Remaining:</span>
                                     <span className={`fs-5 fw-bold ${remaining > 0 ? 'text-danger' : 'text-success'}`}>
                                         ₹{remaining.toFixed(2)}

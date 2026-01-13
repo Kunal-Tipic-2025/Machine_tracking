@@ -1182,7 +1182,7 @@ const MachineUsageForm = () => {
                               />
                             </CCol> */}
 
-                            <CCol xs={12} md={2} className="p-1">
+                            <CCol xs={12} md={3} className="p-1">
                               <CFormLabel>Work Type <span style={{ color: 'red' }}>*</span></CFormLabel>
                               <CInputGroup>
                                 <CFormInput
@@ -1194,7 +1194,7 @@ const MachineUsageForm = () => {
                                   }}
                                   placeholder="Search work type..."
                                 />
-                                { (
+                                {workTypeSearchQuery[index] && (
                                   <CButton
                                     type="button"
                                     color="danger"
@@ -1209,7 +1209,7 @@ const MachineUsageForm = () => {
                                     ✕
                                   </CButton>
                                 )}
-                                <CButton
+                               {!workTypeSearchQuery[index] && <CButton
                                   type="button"
                                   color="primary"
                                   variant="outline"
@@ -1217,7 +1217,7 @@ const MachineUsageForm = () => {
                                   onClick={() => handleShowAllWorkTypes(index)}
                                 >
                                   Show All
-                                </CButton>
+                                </CButton>}
                               </CInputGroup>
                               {showWorkTypeDropdown[index] && (
                                 <div
@@ -1265,7 +1265,7 @@ const MachineUsageForm = () => {
                               )}
                             </CCol>
 
-                            <CCol xs={12} md={2} className="p-1">
+                            <CCol xs={12} md={1} className="p-1">
                               <CFormLabel>Start Reading</CFormLabel>
                               <CFormInput
                                 type="text"

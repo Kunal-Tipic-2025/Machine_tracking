@@ -72,6 +72,10 @@ const ProjectPaymentReport = () => {
     const [projects, setProjects] = useState([]);
     const [projectWiseHours, setProjectWiseHours] = useState([]);
 
+    // Additional charges
+    const [showAdditionalChargesModal, setShowAdditionalChargesModal] = useState(false);
+    const [selectedPaymentForCharges, setSelectedPaymentForCharges] = useState(null);
+
 
     // -------------------------------------------------
     // 3. Data fetching (company-scoped)
@@ -168,6 +172,16 @@ const ProjectPaymentReport = () => {
     };
 
     const formatCurrency = (value) => `₹${Number(value || 0).toFixed(2)}`;
+
+    const formatChargeType = (chargeType) => {
+    const chargeTypeMap = {
+        'travelling_charge': 'Travelling Charges',
+        'service_charge': 'Service Charges',
+        'other_charge': 'Other Charges'
+    };
+    
+    return chargeTypeMap[chargeType] || chargeType;
+};
 
     // -------------------------------------------------
     // 6. Memoised company-only data
@@ -266,7 +280,9 @@ const ProjectPaymentReport = () => {
         if (!selectedPayment || !payAmount || Number(payAmount) <= 0) return;
 
         const amountToPay = Number(payAmount);
-        const newPaid = Number(selectedPayment.paid_amount) + amountToPay;
+        // const newPaid = Number(selectedPayment.paid_amount) + amountToPay;
+        const newPaid = amountToPay;
+
         const remaining = Number(selectedPayment.total) - newPaid;
         const remarkRepayment = remark;
         try {
@@ -791,6 +807,7 @@ const ProjectPaymentReport = () => {
                                             <CTableHeaderCell className="text-center align-middle">Paid</CTableHeaderCell>
                                             <CTableHeaderCell className="text-center align-middle" >Remaining</CTableHeaderCell>
                                             <CTableHeaderCell className="text-center align-middle">Mode</CTableHeaderCell>
+                                            {/* <CTableHeaderCell className="text-center align-middle">Add. Charges</CTableHeaderCell> */}
                                             <CTableHeaderCell className="text-center align-middle">Action</CTableHeaderCell>
                                         </CTableRow>
                                     </CTableHead>
@@ -814,6 +831,15 @@ const ProjectPaymentReport = () => {
                                                         <CTableDataCell className="text-success fw-bold text-end">₹{Number(p.paid_amount).toFixed(2)}</CTableDataCell>
                                                         <CTableDataCell className="text-danger fw-bold text-end">₹{rem}</CTableDataCell>
                                                         <CTableDataCell>{p.payment_mode || '-'}</CTableDataCell>
+                                                        {/* <CTableDataCell className="text-center">
+                                                            {p.additional_charges_total > 0 ? (
+                                                                <CTooltip content={`Paid: ₹${Number(p.additional_charges_paid || 0).toFixed(2)} / Total: ₹${Number(p.additional_charges_total).toFixed(2)}`}>
+                                                                    <CBadge color={p.additional_charges_paid >= p.additional_charges_total ? "success" : "warning"}>
+                                                                        ₹{Number(p.additional_charges_total).toFixed(2)}
+                                                                    </CBadge>
+                                                                </CTooltip>
+                                                            ) : '-'}
+                                                        </CTableDataCell> */}
                                                         <CTableDataCell className="text-center">
                                                             <div className="d-flex justify-content-center gap-1">
                                                                 {p.is_advance == 0 && (<CTooltip content="Add Payment" placement="top">
@@ -862,6 +888,20 @@ const ProjectPaymentReport = () => {
                                                                         <EyeIcon />
                                                                     </CButton>
                                                                 </CTooltip>
+                                                                {/* {p.additional_charges_total > 0 && (
+                                                                    <CTooltip content="View Additional Charges" placement="top">
+                                                                        <CButton
+                                                                            color="warning"
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                setSelectedPaymentForCharges(p);
+                                                                                setShowAdditionalChargesModal(true);
+                                                                            }}
+                                                                        >
+                                                                            <CIcon icon={cilMoney} />
+                                                                        </CButton>
+                                                                    </CTooltip>
+                                                                )} */}
                                                             </div>
                                                         </CTableDataCell>
                                                     </CTableRow>
@@ -924,7 +964,7 @@ const ProjectPaymentReport = () => {
                             {/* Logic: If advance <= remaining, show checkbox to use it */}
                             {advancePaid > 0 && advancePaid <= remaining ? (
                                 <div className="mb-3">
-                                    <div className="form-check mb-2">
+                                    {/* <div className="form-check mb-2">
                                         <input
                                             className="form-check-input"
                                             type="checkbox"
@@ -935,7 +975,7 @@ const ProjectPaymentReport = () => {
                                         <label className="form-check-label" htmlFor="useAdvanceCheck">
                                             Clear from Advance (₹{advancePaid.toFixed(2)})
                                         </label>
-                                    </div>
+                                    </div> */}
 
                                     <label className="form-label">Additional Amount</label>
                                     <CFormInput
@@ -1107,6 +1147,57 @@ const ProjectPaymentReport = () => {
                     <OrderList projectId={selectedProjectId} inModal={true} />
                 </CModalBody>
 
+            </CModal>
+
+
+            {/* Additional Charges Modal */}
+            <CModal
+                visible={showAdditionalChargesModal}
+                onClose={() => {
+                    setShowAdditionalChargesModal(false);
+                    setSelectedPaymentForCharges(null);
+                }}
+                size="lg"
+            >
+                <CModalHeader>
+                    <CModalTitle>Additional Charges - {selectedPaymentForCharges?.invoice_number}</CModalTitle>
+                </CModalHeader>
+                <CModalBody>
+                    {selectedPaymentForCharges?.additionalCharges && selectedPaymentForCharges.additionalCharges.length > 0 ? (
+                        <div className="table-responsive">
+                            <CTable striped bordered>
+                                <CTableHead>
+                                    <CTableRow>
+                                        <CTableHeaderCell>Charge Type</CTableHeaderCell>
+                                        <CTableHeaderCell>Amount</CTableHeaderCell>
+                                        <CTableHeaderCell>Paid</CTableHeaderCell>
+                                        <CTableHeaderCell>Status</CTableHeaderCell>
+                                        <CTableHeaderCell>Remark</CTableHeaderCell>
+                                    </CTableRow>
+                                </CTableHead>
+                                <CTableBody>
+                                    {selectedPaymentForCharges.additionalCharges.map((charge, idx) => (
+                                        <CTableRow key={charge.id}>
+                                            <CTableDataCell>{formatChargeType(charge.charge_type)}</CTableDataCell>
+                                            <CTableDataCell className="text-end">₹{Number(charge.amount).toFixed(2)}</CTableDataCell>
+                                            <CTableDataCell className="text-end text-success fw-bold">
+                                                ₹{Number(charge.paid_amount || 0).toFixed(2)}
+                                            </CTableDataCell>
+                                            <CTableDataCell>
+                                                <CBadge color={charge.is_paid ? "success" : "warning"}>
+                                                    {charge.is_paid ? "Paid" : "Pending"}
+                                                </CBadge>
+                                            </CTableDataCell>
+                                            <CTableDataCell>{charge.remark || '-'}</CTableDataCell>
+                                        </CTableRow>
+                                    ))}
+                                </CTableBody>
+                            </CTable>
+                        </div>
+                    ) : (
+                        <p className="text-muted text-center">No additional charges</p>
+                    )}
+                </CModalBody>
             </CModal>
         </>
     );
