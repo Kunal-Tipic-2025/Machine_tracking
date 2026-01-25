@@ -128,7 +128,8 @@ const NewExpenseType = () => {
                   <option value="Operational Expense">Operational Expense</option>
                   <option value="Capital Expense">Capital Expense</option>
                   <option value="Machine Expense">Machine Expense</option>
-                  <option value="Operator Expense">Operator Expense</option>
+                  <option value="Operator Expense">Operator/Helper Expense</option>
+                  {/* <option value="Helper Expense">Helper Expense</option> */}
                 </CFormSelect>
               </div>
 

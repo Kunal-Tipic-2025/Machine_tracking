@@ -89,7 +89,9 @@ class Expense extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
+    protected $table = 'expenses';
+
+        protected $fillable = [
         'project_id',
         'name',
         'desc',
@@ -152,6 +154,6 @@ class Expense extends Model
      */
     public function machine()
     {
-        return $this->belongsTo(Machine::class, 'machine_id');
+        return $this->belongsTo(Machinery::class, 'machine_id');
     }
 }

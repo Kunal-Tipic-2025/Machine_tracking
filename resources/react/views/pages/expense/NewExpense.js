@@ -52,10 +52,10 @@ const NewExpense = () => {
   const [isOperatorExpense, setIsOperatorExpense] = useState(false);
 
 
+ const companyId = getUserData()?.company_id;
 
 
   const fetchMachineries = async () => {
-    const companyId = getUserData()?.company_id;
 
     // Safety: If no company ID, show error and exit
     if (!companyId) {
@@ -185,7 +185,7 @@ const NewExpense = () => {
     const user = getUserData();
 
     // type === 2 → operator logged in
-    if (user?.type === 2) {
+    if (user?.type === 2 || user?.type === 4) {
       setState(prev => ({
         ...prev,
         operator_id: user.id
@@ -196,7 +196,7 @@ const NewExpense = () => {
   const fetchOperators = async () => {
     try {
       const companyId = getUserData()?.company_id;
-      const response = await getAPICall(`/api/operatorsByCompanyIdOperator`);
+      const response = await getAPICall(`/api/operatorsAnsHelperByCompanyIdOperator`);
       console.log('setOperator', operators);
       setOperators(response || []);
     } catch (err) {
@@ -472,7 +472,7 @@ const NewExpense = () => {
     setValidated(true);
 
     // Backend requires company_id
-    if (!state.company_id) {
+    if (!companyId) {
       showToast("danger", "Company is required for expense submission.");
       return;
     }
@@ -483,7 +483,7 @@ const NewExpense = () => {
     console.log(state);
 
     // Append only active/visible fields
-    formData.append("company_id", state.company_id);
+    formData.append("company_id", companyId);
     if (state.project_id) formData.append("project_id", state.project_id);
     if (state.expense_id) formData.append("expense_id", state.expense_id);
     if (state.desc) formData.append("desc", state.desc);
@@ -603,12 +603,12 @@ const NewExpense = () => {
   const handleClear = async () => {
     setState({
       project_id: '', // ✅ Changed from customer_id to project_id
-      company_id: '',
+      // company_id: '',
       name: '',
       desc: '',
       expense_id: '',
       open: false,
-      qty: '',
+      qty: 1,
       price: 0,
       total_price: 0,
       expense_date: today,
@@ -770,7 +770,7 @@ const NewExpense = () => {
                           console.log('selectedOption', selectedOption);
                           const category = String(selectedOption?.label || '').toLowerCase();
 
-                          const isOperator = category === 'operator';
+                          const isOperator = category === 'operator' || 'helper';
                           const isMachineRelated = category.includes('machine');
 
                           setIsOperatorExpense(isOperator);
@@ -844,7 +844,7 @@ const NewExpense = () => {
                   <div className="col-sm-4">
                     {isOperatorExpense ? (
                       <>
-                        <CFormLabel><b>{t("LABELS.operator_name")}</b></CFormLabel>
+                        <CFormLabel><b>{t("LABELS.operator_helper_name")}</b></CFormLabel>
 
                         <Select
                           value={
@@ -862,7 +862,7 @@ const NewExpense = () => {
                             value: o.id,
                             label: o.name
                           }))}
-                          isDisabled={getUserData()?.type === 2} // 🔒 operator cannot change
+                          isDisabled={getUserData()?.type === 2 || getUserData()?.type === 4} // 🔒 operator cannot change
                           placeholder="Select Operator"
                         />
                       </>
@@ -918,6 +918,7 @@ const NewExpense = () => {
                         name="desc"
                         value={state.desc}
                         onChange={handleChange}
+                        // required
                       />
                     </div>
                   </div>

@@ -336,6 +336,12 @@ export default function fetchRoutes() {
       { path: '/partner/dashboard', name: 'Onboarding partner dashboard', element: PartnerDashboard },
     ]
   }
+   else if (user === 4) {
+    routes = [
+      { path: '/expense/new', name: 'New Type', element: NewExpense },
+      { path: '/expense/new-type', name: 'New Type', element: NewExpenseType },
+    ]
+  }
   return routes;
 }
 

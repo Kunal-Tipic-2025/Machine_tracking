@@ -174,14 +174,14 @@ const ProjectPaymentReport = () => {
     const formatCurrency = (value) => `₹${Number(value || 0).toFixed(2)}`;
 
     const formatChargeType = (chargeType) => {
-    const chargeTypeMap = {
-        'travelling_charge': 'Travelling Charges',
-        'service_charge': 'Service Charges',
-        'other_charge': 'Other Charges'
+        const chargeTypeMap = {
+            'travelling_charge': 'Travelling Charges',
+            'service_charge': 'Service Charges',
+            'other_charge': 'Other Charges'
+        };
+
+        return chargeTypeMap[chargeType] || chargeType;
     };
-    
-    return chargeTypeMap[chargeType] || chargeType;
-};
 
     // -------------------------------------------------
     // 6. Memoised company-only data
@@ -344,6 +344,9 @@ const ProjectPaymentReport = () => {
             showToast('danger', 'Payment recorded but history failed to save.');
         }
     };
+
+
+
 
     const getCustomerTotalHours = (customerProjects) => {
         return customerProjects.reduce((sum, proj) => {
@@ -613,6 +616,122 @@ const ProjectPaymentReport = () => {
         }
     };
 
+    // const handleDownloadHistoryPDF = async () => {
+    //     const payment = payments.find(p => p.invoice_number === selectedInvoice);
+    //     if (!payment) return;
+
+    //     const filteredHistory = historyData.filter(e => e?.invoice_id === selectedInvoice);
+    //     if (filteredHistory.length === 0) {
+    //         showToast('warning', 'No history to download');
+    //         return;
+    //     }
+
+    //     const ci = getUserData()?.company_info;
+    //     if (!ci) {
+    //         alert('Company information not found. Please log in again.');
+    //         return;
+    //     }
+
+    //     const customerName = payment.project?.customer_name || 'N/A';
+    //     const invoiceType = payment.is_fixed_bid == 1 ? 'FIXED BID INVOICE' : 'INVOICE';
+    //     const totalAmount = Number(payment.total || 0).toFixed(2);
+    //     const paidAmount = Number(payment.paid_amount || 0).toFixed(2);
+    //     const remainingAmount = (Number(payment.total) - Number(payment.paid_amount)).toFixed(2);
+
+    //     // Build history rows
+    //     const historyRows = filteredHistory.map((item, index) => `
+    //         <tr>
+    //             <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">${index + 1}</td>
+    //             <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">
+    //                 ${item?.date ? item.date.slice(0, 10).split('-').reverse().join('-') : '-'}
+    //             </td>
+    //             <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${Number(item.payment).toFixed(2)}</td>
+    //             <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${Number(item.remaining).toFixed(2)}</td>
+    //         </tr>
+    //     `).join('');
+
+    //     const pdfContent = `
+    //         <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+    //             <!-- Header Section -->
+    //             <div style="border-bottom: 3px solid #0d6efd; padding-bottom: 20px; margin-bottom: 20px;">
+    //                 <div style="display: flex; justify-content: space-between; align-items: center;">
+    //                     <div style="flex: 1;">
+    //                         ${ci.logo ? `<img src="/img/${ci.logo}" alt="Logo" style="max-width: 120px; height: auto;" />` : ''}
+    //                     </div>
+    //                     <div style="text-align: right; flex: 1;">
+    //                         <h2 style="margin: 0; color: #333; font-size: 24px;">${ci.company_name || ''}</h2>
+    //                         <p style="margin: 5px 0; color: #666; font-size: 14px;">${ci.land_mark || ''}, ${ci.Tal || ''}, ${ci.Dist || ''}</p>
+    //                         <p style="margin: 5px 0; color: #666; font-size: 14px;">Pincode: ${ci.pincode || ''}</p>
+    //                         <p style="margin: 5px 0; color: #666; font-size: 14px;">Phone: ${ci.phone_no || ''}</p>
+    //                     </div>
+    //                 </div>
+    //             </div>
+
+    //             <!-- Title -->
+    //             <div style="text-align: center; background-color: #0d6efd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+    //                 <h2 style="margin: 0; color: #fff; font-size: 20px;">PAYMENT HISTORY - ${invoiceType}</h2>
+    //             </div>
+
+    //             <!-- Invoice & Customer Details -->
+    //             <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+    //                 <div style="flex: 1;">
+    //                     <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Invoice Details</h3>
+    //                     <p style="margin: 5px 0;"><strong>Invoice Number:</strong> ${payment.invoice_number}</p>
+    //                     <p style="margin: 5px 0;"><strong>Date:</strong> ${formatDate(payment.created_at)}</p>
+    //                     <p style="margin: 5px 0;"><strong>Total Amount:</strong> ₹${totalAmount}</p>
+    //                     <p style="margin: 5px 0;"><strong>Paid Amount:</strong> ₹${paidAmount}</p>
+    //                     <p style="margin: 5px 0;"><strong>Remaining:</strong> ₹${remainingAmount}</p>
+    //                 </div>
+    //                 <div style="flex: 1;">
+    //                     <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Customer Details</h3>
+    //                     <p style="margin: 5px 0;"><strong>Customer Name:</strong> ${customerName}</p>
+    //                     <p style="margin: 5px 0;"><strong>Mobile:</strong> ${payment.project?.mobile_number || '-'}</p>
+    //                     <p style="margin: 5px 0;"><strong>Site:</strong> ${payment.project?.work_place || '-'}</p>
+    //                 </div>
+    //             </div>
+
+    //             <!-- History Table -->
+    //             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+    //                 <thead>
+    //                     <tr style="background-color: #f8f9fa;">
+    //                         <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Sr. No.</th>
+    //                         <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Date</th>
+    //                         <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Paid Amount</th>
+    //                         <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Remaining</th>
+    //                     </tr>
+    //                 </thead>
+    //                 <tbody>
+    //                     ${historyRows}
+    //                 </tbody>
+    //             </table>
+
+    //             <!-- Footer -->
+    //             <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; text-align: center; color: #666; font-size: 12px;">
+    //                 <p>This is a computer-generated document and is valid without signature.</p>
+    //             </div>
+    //         </div>
+    //     `;
+
+    //     const element = document.createElement('div');
+    //     element.innerHTML = pdfContent;
+
+    //     const options = {
+    //         margin: [10, 10, 10, 10],
+    //         filename: `History-${payment.invoice_number}-${customerName}.pdf`,
+    //         image: { type: 'jpeg', quality: 0.98 },
+    //         html2canvas: { scale: 2, useCORS: true },
+    //         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    //     };
+
+    //     try {
+    //         await html2pdf().set(options).from(element).save();
+    //         showToast('success', 'History PDF downloaded successfully');
+    //     } catch (error) {
+    //         console.error('PDF generation error:', error);
+    //         showToast('danger', 'Failed to generate PDF');
+    //     }
+    // };
+
     const handleDownloadHistoryPDF = async () => {
         const payment = payments.find(p => p.invoice_number === selectedInvoice);
         if (!payment) return;
@@ -635,79 +754,87 @@ const ProjectPaymentReport = () => {
         const paidAmount = Number(payment.paid_amount || 0).toFixed(2);
         const remainingAmount = (Number(payment.total) - Number(payment.paid_amount)).toFixed(2);
 
-        // Build history rows
-        const historyRows = filteredHistory.map((item, index) => `
+        // ✅ Build history rows with corrected remaining calculation
+        let cumulativePaid = 0;
+        const invoiceTotal = Number(payment.total || 0);
+
+        const historyRows = filteredHistory.map((item, index) => {
+            cumulativePaid += Number(item.payment || 0);
+            const calculatedRemaining = invoiceTotal - cumulativePaid;
+
+            return `
             <tr>
                 <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">${index + 1}</td>
                 <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">
                     ${item?.date ? item.date.slice(0, 10).split('-').reverse().join('-') : '-'}
                 </td>
                 <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${Number(item.payment).toFixed(2)}</td>
-                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${Number(item.remaining).toFixed(2)}</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right;">₹${calculatedRemaining.toFixed(2)}</td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
 
         const pdfContent = `
-            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
-                <!-- Header Section -->
-                <div style="border-bottom: 3px solid #0d6efd; padding-bottom: 20px; margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="flex: 1;">
-                            ${ci.logo ? `<img src="/img/${ci.logo}" alt="Logo" style="max-width: 120px; height: auto;" />` : ''}
-                        </div>
-                        <div style="text-align: right; flex: 1;">
-                            <h2 style="margin: 0; color: #333; font-size: 24px;">${ci.company_name || ''}</h2>
-                            <p style="margin: 5px 0; color: #666; font-size: 14px;">${ci.land_mark || ''}, ${ci.Tal || ''}, ${ci.Dist || ''}</p>
-                            <p style="margin: 5px 0; color: #666; font-size: 14px;">Pincode: ${ci.pincode || ''}</p>
-                            <p style="margin: 5px 0; color: #666; font-size: 14px;">Phone: ${ci.phone_no || ''}</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Title -->
-                <div style="text-align: center; background-color: #0d6efd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
-                    <h2 style="margin: 0; color: #fff; font-size: 20px;">PAYMENT HISTORY - ${invoiceType}</h2>
-                </div>
-
-                <!-- Invoice & Customer Details -->
-                <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto;">
+            <!-- Header Section -->
+            <div style="border-bottom: 3px solid #0d6efd; padding-bottom: 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="flex: 1;">
-                        <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Invoice Details</h3>
-                        <p style="margin: 5px 0;"><strong>Invoice Number:</strong> ${payment.invoice_number}</p>
-                        <p style="margin: 5px 0;"><strong>Date:</strong> ${formatDate(payment.created_at)}</p>
-                        <p style="margin: 5px 0;"><strong>Total Amount:</strong> ₹${totalAmount}</p>
-                        <p style="margin: 5px 0;"><strong>Paid Amount:</strong> ₹${paidAmount}</p>
-                        <p style="margin: 5px 0;"><strong>Remaining:</strong> ₹${remainingAmount}</p>
+                        ${ci.logo ? `<img src="/img/${ci.logo}" alt="Logo" style="max-width: 120px; height: auto;" />` : ''}
                     </div>
-                    <div style="flex: 1;">
-                        <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Customer Details</h3>
-                        <p style="margin: 5px 0;"><strong>Customer Name:</strong> ${customerName}</p>
-                        <p style="margin: 5px 0;"><strong>Mobile:</strong> ${payment.project?.mobile_number || '-'}</p>
-                        <p style="margin: 5px 0;"><strong>Site:</strong> ${payment.project?.work_place || '-'}</p>
+                    <div style="text-align: right; flex: 1;">
+                        <h2 style="margin: 0; color: #333; font-size: 24px;">${ci.company_name || ''}</h2>
+                        <p style="margin: 5px 0; color: #666; font-size: 14px;">${ci.land_mark || ''}, ${ci.Tal || ''}, ${ci.Dist || ''}</p>
+                        <p style="margin: 5px 0; color: #666; font-size: 14px;">Pincode: ${ci.pincode || ''}</p>
+                        <p style="margin: 5px 0; color: #666; font-size: 14px;">Phone: ${ci.phone_no || ''}</p>
                     </div>
-                </div>
-
-                <!-- History Table -->
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
-                    <thead>
-                        <tr style="background-color: #f8f9fa;">
-                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Sr. No.</th>
-                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Date</th>
-                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Paid Amount</th>
-                            <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Remaining</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${historyRows}
-                    </tbody>
-                </table>
-
-                <!-- Footer -->
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; text-align: center; color: #666; font-size: 12px;">
-                    <p>This is a computer-generated document and is valid without signature.</p>
                 </div>
             </div>
-        `;
+
+            <!-- Title -->
+            <div style="text-align: center; background-color: #0d6efd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                <h2 style="margin: 0; color: #fff; font-size: 20px;">PAYMENT HISTORY - ${invoiceType}</h2>
+            </div>
+
+            <!-- Invoice & Customer Details -->
+            <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
+                <div style="flex: 1;">
+                    <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Invoice Details</h3>
+                    <p style="margin: 5px 0;"><strong>Invoice Number:</strong> ${payment.invoice_number}</p>
+                    <p style="margin: 5px 0;"><strong>Date:</strong> ${formatDate(payment.created_at)}</p>
+                    <p style="margin: 5px 0;"><strong>Total Amount:</strong> ₹${totalAmount}</p>
+                    <p style="margin: 5px 0;"><strong>Paid Amount:</strong> ₹${paidAmount}</p>
+                    <p style="margin: 5px 0;"><strong>Remaining:</strong> ₹${remainingAmount}</p>
+                </div>
+                <div style="flex: 1;">
+                    <h3 style="color: #333; border-bottom: 2px solid #0d6efd; padding-bottom: 5px; margin-bottom: 10px;">Customer Details</h3>
+                    <p style="margin: 5px 0;"><strong>Customer Name:</strong> ${customerName}</p>
+                    <p style="margin: 5px 0;"><strong>Mobile:</strong> ${payment.project?.mobile_number || '-'}</p>
+                    <p style="margin: 5px 0;"><strong>Site:</strong> ${payment.project?.work_place || '-'}</p>
+                </div>
+            </div>
+
+            <!-- History Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px;">
+                <thead>
+                    <tr style="background-color: #f8f9fa;">
+                        <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Sr. No.</th>
+                        <th style="border: 1px solid #dee2e6; padding: 10px; text-align: center;">Date</th>
+                        <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Paid Amount</th>
+                        <th style="border: 1px solid #dee2e6; padding: 10px; text-align: right;">Remaining</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${historyRows}
+                </tbody>
+            </table>
+
+            <!-- Footer -->
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; text-align: center; color: #666; font-size: 12px;">
+                <p>This is a computer-generated document and is valid without signature.</p>
+            </div>
+        </div>
+    `;
 
         const element = document.createElement('div');
         element.innerHTML = pdfContent;
@@ -728,8 +855,6 @@ const ProjectPaymentReport = () => {
             showToast('danger', 'Failed to generate PDF');
         }
     };
-
-
 
 
 
@@ -1029,8 +1154,7 @@ const ProjectPaymentReport = () => {
 
 
             {/* History modal */}
-            {/* History modal */}
-            <CModal visible={showHistoryModal} onClose={() => setShowHistoryModal(false)} size="lg">
+            {/* <CModal visible={showHistoryModal} onClose={() => setShowHistoryModal(false)} size="lg">
                 <CModalHeader>
                     <div className="d-flex justify-content-between align-items-center w-100">
                         <CModalTitle>Payment History</CModalTitle>
@@ -1080,8 +1204,69 @@ const ProjectPaymentReport = () => {
                         </div>
                     )}
                 </CModalBody>
-            </CModal>
+            </CModal> */}
 
+            {/* History modal */}
+            <CModal visible={showHistoryModal} onClose={() => setShowHistoryModal(false)} size="lg">
+                <CModalHeader>
+                    <div className="d-flex justify-content-between align-items-center w-100">
+                        <CModalTitle>Payment History</CModalTitle>
+                        <CButton
+                            color="success"
+                            size="sm"
+                            className="me-4"
+                            onClick={handleDownloadHistoryPDF}
+                            title="Download History PDF"
+                        >
+                            <CIcon icon={cilCloudDownload} className="me-1" />
+                            Download PDF
+                        </CButton>
+                    </div>
+                </CModalHeader>
+                <CModalBody>
+                    {historyData.filter(e => e?.invoice_id === selectedInvoice).length > 0 ? (
+                        <div className="table-responsive">
+                            <CTable striped hover bordered>
+                                <CTableHead color="dark">
+                                    <CTableRow>
+                                        <CTableHeaderCell>Date</CTableHeaderCell>
+                                        <CTableHeaderCell>Paid</CTableHeaderCell>
+                                        <CTableHeaderCell>Remaining</CTableHeaderCell>
+                                        <CTableHeaderCell>Remark</CTableHeaderCell>
+                                    </CTableRow>
+                                </CTableHead>
+                                <CTableBody>
+                                    {(() => {
+                                        const filteredHistory = historyData.filter(e => e?.invoice_id === selectedInvoice);
+                                        const invoiceTotal = filteredHistory[0]?.total || 0;
+                                        let cumulativePaid = 0;
+
+                                        return filteredHistory.map((e, i) => {
+                                            cumulativePaid += Number(e.payment || 0);
+                                            const calculatedRemaining = Number(invoiceTotal) - cumulativePaid;
+
+                                            return (
+                                                <CTableRow key={i}>
+                                                    <CTableDataCell>
+                                                        {e?.date ? e.date.slice(0, 10).split('-').reverse().join('-') : ''}
+                                                    </CTableDataCell>
+                                                    <CTableDataCell>₹{e.payment}</CTableDataCell>
+                                                    <CTableDataCell>₹{calculatedRemaining.toFixed(2)}</CTableDataCell>
+                                                    <CTableDataCell>{e.remark}</CTableDataCell>
+                                                </CTableRow>
+                                            );
+                                        });
+                                    })()}
+                                </CTableBody>
+                            </CTable>
+                        </div>
+                    ) : (
+                        <div className="text-center py-4 text-muted">
+                            <p className="mb-0">No payment history found for this invoice.</p>
+                        </div>
+                    )}
+                </CModalBody>
+            </CModal>
 
             {/* Make-payment modal */}
             <CModal visible={showPaymentModal} onClose={() => setShowPaymentModal(false)}>

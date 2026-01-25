@@ -16,7 +16,7 @@ return new class extends Migration
 
             $table->unsignedBigInteger('operator_id');
             $table->unsignedBigInteger('company_id');
-            $table->string('about_expenses');
+            $table->string('about_expenses')->nullable();
             $table->decimal('total_amount', 10, 2);
             $table->boolean('is_settle');
             $table->date('expense_date');

@@ -30,7 +30,7 @@ class OperatorReportDashboardController extends Controller
                     ->where('company_id', $companyId)
                     ->where('type', 2);
             })
-            ->sum('amount');
+            ->sum(DB::raw('GREATEST(amount - COALESCE(repayment_amount, 0), 0)'));
 
         $totalExpensePending = OperatorExpense::where('company_id', $companyId)
             ->where('is_settle', false)
@@ -69,7 +69,7 @@ class OperatorReportDashboardController extends Controller
 
 
         $operators = User::where('company_id', $companyId)
-            ->where('type', 2)
+            ->whereIn('type', [2,4])
             ->withSum([
                 'advances as pending_advances' => function ($q) {
                     $q->where('is_settle', false);

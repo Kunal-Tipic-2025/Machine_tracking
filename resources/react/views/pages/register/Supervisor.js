@@ -104,6 +104,7 @@ const SupervisorsList = () => {
       { label: 'Select User Type ', value: '' },
       { label: 'Admin', value: '1' },
       { label: 'Operator', value: '2', disabled: false },
+      { label: 'Helper', value: '4', disabled: false },
     ]
   } else {
     userTypes = [
@@ -155,7 +156,18 @@ const SupervisorsList = () => {
     if (selectedType === 2) {
       if (!paymentValue || paymentValue.trim() === '') {
         setIsPaymentInvalid(true)
-        setPaymentErrorMessage('Payment per hour is required for Operator')
+        setPaymentErrorMessage('Payment per month is required for Operator')
+      } else if (parseInt(paymentValue) <= 0) {
+        setIsPaymentInvalid(true)
+        setPaymentErrorMessage('Payment must be greater than 0')
+      } else {
+        setIsPaymentInvalid(false)
+        setPaymentErrorMessage('')
+      }
+    } else if (selectedType === 4) {
+      if (!paymentValue || paymentValue.trim() === '') {
+        setIsPaymentInvalid(true)
+        setPaymentErrorMessage('Payment per month is required for Helper')
       } else if (parseInt(paymentValue) <= 0) {
         setIsPaymentInvalid(true)
         setPaymentErrorMessage('Payment must be greater than 0')
@@ -198,7 +210,7 @@ const SupervisorsList = () => {
     if (isCompany) {
       setCompanyIsInvalid(!(value > 0))
     } else {
-      setTypeIsInvalid(![0, 1, 2].includes(value))
+      setTypeIsInvalid(![0, 1, 2, 3, 4].includes(value))
       setSelectedType(value)
     }
   }
@@ -376,13 +388,17 @@ const SupervisorsList = () => {
       supervisorData.payment_per_hour = payment.current.value;
     }
 
+    if (selectedType === 4 && payment.current?.value) {
+      supervisorData.payment_per_hour = payment.current.value;
+    }
+
     if (addressRef.current?.value) {
       supervisorData.address = addressRef.current.value.trim();
     }
 
     try {
       const resp = await register(supervisorData);
-      if (resp) {
+      if (resp.id) {
         const newSupervisorId = resp.id || resp.data?.id;
 
         // ---------- ASSIGN MACHINES ----------
@@ -420,6 +436,14 @@ const SupervisorsList = () => {
             : "New supervisor created successfully"
         );
 
+        if (supervisorData.type === "4") { // <-- detect Helper
+          showToast(
+            "success",
+            "New Helper created successfully"
+          );
+        };
+
+
         closeModal();
         fetchSupervisors();
         fetchMachines();
@@ -428,7 +452,7 @@ const SupervisorsList = () => {
         showToast("danger", "Error occurred, please try again later.");
       }
     } catch (error) {
-      showToast("danger", "Error occurred " + error);
+      showToast("danger", error.message);
     }
   };
 
@@ -510,13 +534,17 @@ const SupervisorsList = () => {
         mobile: cleanMobile,               // store only digits
         type: editSupervisor.type,
         company_id: editSupervisor.company_id || user.company_id,
-        type: editSupervisor.type,
+        // type: editSupervisor.type,
         company_id: editSupervisor.company_id || user.company_id,
         blocked: editSupervisor.blocked ?? 0,
       };
 
       // Add payment_per_hour if type is Operator (2)
       if (editSupervisor.type === 2 && editSupervisor.payment) {
+        payload.payment_per_hour = editSupervisor.payment;
+      }
+
+      if (editSupervisor.type === 4 && editSupervisor.payment) {
         payload.payment_per_hour = editSupervisor.payment;
       }
 
@@ -650,7 +678,7 @@ const SupervisorsList = () => {
                             <CTableDataCell>{u.mobile}</CTableDataCell>
                             <CTableDataCell>{u.address}</CTableDataCell>
                             <CTableDataCell>
-                              {u.type === 0 ? "Super Admin" : u.type === 1 ? "Admin" : "Operator"}
+                              {u.type === 0 ? "Super Admin" : u.type === 1 ? "Admin" :  u.type === 2 ? "Operator": "Helper"}
                             </CTableDataCell>
                             <CTableDataCell>{u.payment}</CTableDataCell>
                             <CTableDataCell>
@@ -737,12 +765,37 @@ const SupervisorsList = () => {
                         e.target.value = value;
                         handlePaymentChange();
                       }}
-                      feedbackInvalid={paymentErrorMessage || "Please provide payment per hour."}
+                      feedbackInvalid={paymentErrorMessage || "Please provide payment per month."}
                       maxLength="10"
                     />
                   </CInputGroup>
                 </div>
               )}
+
+              {/* Payment (only if selectedType === 4) */}
+              {selectedType === 4 && (
+                <div className="flex-fill mt-4">
+                  <CInputGroup>
+                    <CInputGroupText>
+                      <CIcon icon={cilMoney} />
+                    </CInputGroupText>
+                    <CFormInput
+                      ref={payment}
+                      placeholder="Add payment per Month"
+                      required
+                      invalid={isPaymentInvalid}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "");
+                        e.target.value = value;
+                        handlePaymentChange();
+                      }}
+                      feedbackInvalid={paymentErrorMessage || "Please provide payment per month."}
+                      maxLength="10"
+                    />
+                  </CInputGroup>
+                </div>
+              )}
+
             </div>
 
             <div className="d-flex gap-3 mb-3">
@@ -1074,7 +1127,7 @@ const SupervisorsList = () => {
               </div>
 
               {/* Payment Input for Operators */}
-              {editSupervisor.type === 2 && (
+              {editSupervisor.type === 2 || 3 && (
                 <div className="mb-3">
                   <CFormInput
                     label="Payment per Month"
@@ -1090,7 +1143,7 @@ const SupervisorsList = () => {
 
 
 
-              <div className="mb-2 position-relative">
+              {editSupervisor.type === 2 && <div className="mb-2 position-relative">
                 <span
                   style={{
                     position: "relative",
@@ -1111,11 +1164,11 @@ const SupervisorsList = () => {
                     borderTop: "2px solid #0d6efd", // solid blue line
                   }}
                 />
-              </div>
+              </div>}
 
 
               {/* Add Machine Dropdown */}
-              <CFormSelect
+             {editSupervisor.type === 2 &&  <CFormSelect
                 className="mb-3"
                 label="Add Machine"
                 value=""
@@ -1135,9 +1188,10 @@ const SupervisorsList = () => {
                     </option>
                   )
                 })}
-              </CFormSelect>
+              </CFormSelect>}
 
               {/* Allocated Machines List */}
+              {editSupervisor.type === 2 && 
               <div className="mt-4">
                 <label className="form-label"><strong>Allocated Machines</strong></label>
 
@@ -1201,7 +1255,7 @@ const SupervisorsList = () => {
                     return (isAssigned || isPendingAdd) && !isPendingRemove;
                   }).length === 0 && <div className="text-muted">No machines allocated</div>}
                 </div>
-              </div>
+              </div>}
 
             </>
           )}

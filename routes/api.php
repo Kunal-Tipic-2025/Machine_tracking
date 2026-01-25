@@ -232,6 +232,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::get('/operatorsByCompanyId', [OperatorController::class, 'showComapnyIdWise']);
     Route::get('/operatorsByCompanyIdOperator', [OperatorController::class, 'showComapnyIdWiseOperator']);
+    Route::get('/operatorsAnsHelperByCompanyIdOperator', [OperatorController::class, 'showComapnyIdWiseOperatorAndHelper']);
 
     Route::get('/operatorsByType', [OperatorController::class, 'showTypeWise']);
 

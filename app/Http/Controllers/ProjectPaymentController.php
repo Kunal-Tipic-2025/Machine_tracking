@@ -475,7 +475,7 @@ class ProjectPaymentController extends Controller
 
         $incomingPayment = (float) $request->paid_amount;
 
-        if ($incomingPayment <= 0) {
+        if ($incomingPayment < 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'Payment amount must be greater than 0'

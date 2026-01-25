@@ -306,7 +306,7 @@ export default function fetchNavItems(t1) {
     ];
   }
 
-  // Manager (user === 2) - Simple navigation
+  // Operator (user === 2) - Simple navigation
   else if (user === 2) {
     _nav = [
       {
@@ -404,6 +404,44 @@ export default function fetchNavItems(t1) {
       //     },
       //   ],
       // },
+    ];
+  }
+
+
+ 
+
+
+    //Helper
+  else if (user === 4) {
+    _nav = [
+      // {
+      //   component: CNavItem,
+      //   name: t("LABELS.invoice"),
+      //   to: '/invoice',
+      //   icon: <CIcon icon={cibElasticStack} customClassName="nav-icon" />,
+      //   // style: { backgroundColor: 'cyan', color: 'black' },
+      // },
+      // {
+      //   component: CNavItem,
+      //   name: t("LABELS.work_log"),
+      //   to: '/worklog',
+      //   icon: <CIcon icon={cilColorBorder} customClassName="nav-icon" />,
+      // },
+      // {
+      //   component: CNavItem,
+      //   name: t("LABELS.all_customers"),
+      //   to: '/project',
+      //   icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+      // },
+
+
+      {
+        component: CNavItem,
+        name: t("LABELS.new_expense"),
+        to: '/expense/new',
+        icon: <CIcon icon={cilDollar} customClassName="nav-icon" />,
+      },
+     
     ];
   }
 

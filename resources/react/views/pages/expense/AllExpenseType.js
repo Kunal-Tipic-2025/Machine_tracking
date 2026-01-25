@@ -869,6 +869,7 @@ const AllExpenseType = () => {
           <option value="Capital Expense">Capital Expense</option>
           <option value="Machine Expense">Machine Expense</option>
           <option value="Operator Expense">Operator Expense</option>
+          
         </CFormSelect>
       </div>
 

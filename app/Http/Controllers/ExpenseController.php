@@ -1440,7 +1440,7 @@ class ExpenseController extends Controller
         $expenseType = ExpenseType::findOrFail($request->expense_id);
         $user = Auth::user();
 
-        DB::beginTransaction();
+        // DB::beginTransaction();
 
         try {
             if ($expenseType->name === 'Operator') {
@@ -1450,7 +1450,7 @@ class ExpenseController extends Controller
                         'required',
                         'integer',
                         ValidationRule::exists('users', 'id')->where(function ($query) {
-                            $query->where('type', 2);
+                            $query->whereIn('type', [2, 4]);
                         }),
                     ],
                     'total_price' => 'required|numeric|min:0',
@@ -1551,10 +1551,10 @@ class ExpenseController extends Controller
                 ]);
             }
 
-            DB::commit();
+            // DB::commit();
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            // DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }

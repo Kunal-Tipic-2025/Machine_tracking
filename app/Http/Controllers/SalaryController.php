@@ -47,7 +47,7 @@ class SalaryController extends Controller
             $totalAdvance = AdvanceRecord::whereIn('id', $request->advance_ids ?? [])
                 ->where('operator_id', $request->operator_id)
                 ->where('is_settle', false)
-                ->sum('amount');
+                ->sum(DB::raw('amount - repayment_amount'));
 
             $totalExpense = OperatorExpense::whereIn('id', $request->expense_ids ?? [])
                 ->where('operator_id', $request->operator_id)

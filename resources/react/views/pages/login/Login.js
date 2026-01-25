@@ -141,7 +141,9 @@ const Login = () => {
             navigate('/worklog');
           } else if (userOrPartner.type === 0) {
             navigate('/company/all');
-          } else {
+          }  else if (userOrPartner.type === 4) {
+            navigate('/expense/new');
+          }else {
             navigate('/dashboard');
           }
         } else {

@@ -139,6 +139,19 @@ public function showComapnyIdWiseOperator()
 }
 
 
+//helper and operator fetch
+public function showComapnyIdWiseOperatorAndHelper()
+{
+    $userCompanyId = auth()->user()->company_id;
+
+    // $operators = Operator::where('company_id', $userCompanyId)
+    $operators = User::where('company_id', $userCompanyId)
+        ->whereIn('type', [2, 4])
+        ->get();
+
+    return response()->json($operators);
+}
+
 
 // public function showTypeWise()
 // {

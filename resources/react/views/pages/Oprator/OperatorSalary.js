@@ -22,6 +22,7 @@ import {
 import { getAPICall, getWithParams, post } from "../../../util/api";
 import { getUserData } from "../../../util/session";
 import { useToast } from "../../common/toast/ToastContext";
+import { useTranslation } from 'react-i18next';
 
 /* ---------------- DEMO DATA ---------------- */
 
@@ -258,7 +259,9 @@ const OperatorSalary = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
- const { showToast } = useToast();
+  const { t } = useTranslation("global");
+  
+  const { showToast } = useToast();
 
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7) // YYYY-MM
@@ -324,6 +327,34 @@ const OperatorSalary = () => {
     );
   }, [operators, debouncedSearchQuery]);
 
+  const refreshOperatorSummary = async () => {
+    const data = await getWithParams(
+      'api/dashboard/operator-summary',
+      { company_id: user.company_id }
+    );
+
+    const safeData = data.map(op => ({
+      ...op,
+      settlements: op.settlements || [],
+      expenses: op.expenses || [],
+      advances: op.advances || [],
+    }));
+
+    setOperators(safeData);
+  };
+
+  const refreshDashboardSummary = async () => {
+    const summary = await getWithParams(
+      'api/dashboard/summary',
+      {
+        company_id: user.company_id,
+        month: selectedMonth,
+      }
+    );
+
+    setDashboardSummary(summary);
+  };
+
   const openManageModal = async (operator) => {
     const [rawAdvances, rawExpenses, history] = await Promise.all([
       getWithParams('api/advances/repaid-unsettled', { operator_id: operator.id }),
@@ -352,11 +383,11 @@ const OperatorSalary = () => {
     }));
 
     const salaryHistory = (history.salary_history || []).map(s => ({
-  month: s.month,
-  paid: Number(s.net_salary || 0),
-  expenses: [], // we don’t show detailed expense list here
-  advanceApplied: Number(s.total_advance_deducted || 0),
-}));
+      month: s.month,
+      paid: Number(s.net_salary || 0),
+      expenses: Number(s.total_expense_deducted|| 0 ), // we don’t show detailed expense list here
+      advanceApplied: Number(s.total_advance_deducted || 0),
+    }));
 
     setActiveOperator({
       ...operator,
@@ -453,19 +484,50 @@ const OperatorSalary = () => {
         remark: newAdvanceRemark,
       });
 
-      // 2️⃣ Re-fetch pending advances for this operator
-      const advances = await getWithParams('api/advances/pending', {
-        operator_id: selectedOperatorForAdvance.id,
-      });
 
-      // 3️⃣ Update operators state safely
-      setOperators(prev =>
-        prev.map(op =>
-          op.id === selectedOperatorForAdvance.id
-            ? { ...op, advances }
-            : op
-        )
-      );
+      // // 2️⃣ Re-fetch pending advances for this operator
+      // const advances = await getWithParams('api/advances/pending', {
+      //   operator_id: selectedOperatorForAdvance.id,
+      // });
+
+      // // 3️⃣ Update operators state safely
+      // setOperators(prev =>
+      //   prev.map(op =>
+      //     op.id === selectedOperatorForAdvance.id
+      //       ? { ...op, advances }
+      //       : op
+      //   )
+      // );
+
+
+      // 2️⃣ REFRESH OPERATOR TABLE DATA 🔥
+      await refreshOperatorSummary();
+
+      // 3️⃣ REFRESH DASHBOARD TOTALS 🔥
+      await refreshDashboardSummary();
+
+      // 4️⃣ If manage modal is open → refresh advances
+      if (activeOperator?.id === selectedOperatorForAdvance.id) {
+        const rawAdvances = await getWithParams(
+          'api/advances/repaid-unsettled',
+          { operator_id: selectedOperatorForAdvance.id }
+        );
+
+        const advances = rawAdvances.map(a => ({
+          id: a.id,
+          date: a.advance_date,
+          amount: Number(a.amount),
+          repaidAmount: Number(a.repayment_amount || 0),
+          balance: Number(a.amount) - Number(a.repayment_amount || 0),
+          apply: false,
+          remark: a.remark,
+        }));
+
+        setActiveOperator(prev => ({
+          ...prev,
+          advances,
+        }));
+      }
 
       // 4️⃣ Reset UI
       setNewAdvanceAmount('');
@@ -477,7 +539,7 @@ const OperatorSalary = () => {
       showToast('success', 'Advance added successfully');
     } catch (error) {
       // alert(error.message || 'Failed to add advance');
-      showToast('danger','Failed to add advance');
+      showToast('danger', 'Failed to add advance');
     }
   };
 
@@ -534,18 +596,54 @@ const OperatorSalary = () => {
       });
 
       // 2️⃣ Refresh pending advances
-      const advances = await getWithParams('api/advances/pending', {
-        operator_id: operatorId,
+      // const advances = await getWithParams('api/advances/pending', {
+      //   operator_id: operatorId,
+      // });
+
+      const advances = await getWithParams(
+        'api/advances/repaid-unsettled',
+        { operator_id: operatorId }
+      );
+
+      // ✅ Update active operator (modal)
+      setActiveOperator(prev => {
+        if (!prev || prev.id !== operatorId) return prev;
+
+        const previousApplyMap = new Map(
+          prev.advances.map(a => [a.id, a.apply])
+        );
+
+        const adaptedAdvances = advances.map(a => ({
+          id: a.id,
+          date: a.advance_date,
+          amount: Number(a.amount || 0),
+          repaidAmount: Number(a.repayment_amount || 0),
+          balance: Number(a.amount || 0) - Number(a.repayment_amount || 0),
+          apply: previousApplyMap.get(a.id) ?? false, // ✅ KEEP USER SELECTION
+          remark: a.remark,
+        }));
+
+
+        // return { ...prev, advances: adaptedAdvances };
       });
 
-      // 3️⃣ Update operator advances
-      setOperators(prev =>
-        prev.map(op =>
-          op.id === operatorId
-            ? { ...op, advances }
-            : op
-        )
-      );
+
+        // 🔥 ADD THIS: Refresh operator table data
+    await refreshOperatorSummary();
+
+    // 🔥 ADD THIS: Refresh dashboard totals
+    await refreshDashboardSummary();
+
+      // // 3️⃣ Update operator advances
+      // setOperators(prev =>
+      //   prev.map(op =>
+      //     op.id === operatorId
+      //       ? { ...op, advances: adaptedAdvances }
+      //       : op
+      //   )
+      // );
+
+
 
       // 4️⃣ Clear repayment input
       setRepaymentAmounts(prev => {
@@ -555,7 +653,7 @@ const OperatorSalary = () => {
       });
 
       // alert('Advance settled successfully');
-      showToast('success', 'Advance added successfully');
+      showToast('success', 'Advance settled successfully');
 
       setShowAdvanceModal(false);
     } catch (error) {
@@ -570,9 +668,9 @@ const OperatorSalary = () => {
     if (numValue > maxAmount) {
       // alert(`Repayment amount cannot exceed advance amount of ₹${maxAmount}`);
       showToast(
-  'warning',
-  `Repayment amount cannot exceed advance amount of ₹${maxAmount}`
-);
+        'warning',
+        `Repayment amount cannot exceed advance amount of ₹${maxAmount}`
+      );
 
       return;
     }
@@ -793,13 +891,13 @@ const OperatorSalary = () => {
       setDashboardSummary(summary);
       // setOperators(operatorSummary);
 
-        const safeOperators = operatorSummary.map(op => ({
-      ...op,
-      settlements: op.settlements || [],
-      expenses: op.expenses || [],
-      advances: op.advances || []
-    }));
-    setOperators(safeOperators);
+      const safeOperators = operatorSummary.map(op => ({
+        ...op,
+        settlements: op.settlements || [],
+        expenses: op.expenses || [],
+        advances: op.advances || []
+      }));
+      setOperators(safeOperators);
       // 3️⃣ Close modal & reset local state
       setActiveOperator(null);
 
@@ -808,7 +906,7 @@ const OperatorSalary = () => {
 
     } catch (error) {
       // alert(error.message || 'Failed to settle salary');
-      showToast('danger', 'Failed to settle salary');
+      showToast('danger', error.message);
 
     }
   };
@@ -862,43 +960,47 @@ const OperatorSalary = () => {
       </CRow> */}
 
       <CRow className="mb-4 g-3">
-        <CCol xs={6} md={3}>
+        <CCol xs={6} md={4}>
           <CCard className="text-center shadow-sm border-0">
             <CCardBody className="p-3">
               <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: 'bold', color: '#4f46e5' }}>
                 {operators.length}
               </div>
               <div className="text-muted" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
-                Total Operators
+                
+                {t("LABELS.total_operator_helper")}
+                {/* {toggleExpense('LABELS.total_operator_helper')} */}
               </div>
             </CCardBody>
           </CCard>
         </CCol>
-        <CCol xs={6} md={3}>
+        <CCol xs={6} md={4}>
           <CCard className="text-center shadow-sm border-0">
             <CCardBody className="p-3">
               <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: 'bold', color: '#059669' }}>
                 ₹{operators.reduce((sum, op) => sum + Number(op.payment || 0), 0).toLocaleString()}
               </div>
               <div className="text-muted" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
-                Total Payroll
+                {/* Total Payroll */}
+                 {t("LABELS.total_payroll")}
               </div>
             </CCardBody>
           </CCard>
         </CCol>
-        <CCol xs={6} md={3}>
+        <CCol xs={6} md={4}>
           <CCard className="text-center shadow-sm border-0">
             <CCardBody className="p-3">
               <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: 'bold', color: '#dc2626' }}>
                 ₹{dashboardSummary.total_advance_pending}
               </div>
               <div className="text-muted" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
-                Total Advances
+                {/* Total Advances */}
+                 {t("LABELS.total_advane")}
               </div>
             </CCardBody>
           </CCard>
         </CCol>
-        <CCol xs={6} md={3}>
+        {/* <CCol xs={6} md={3}>
           <CCard className="text-center shadow-sm border-0">
             <CCardBody className="p-3">
               <div style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', fontWeight: 'bold', color: '#7c3aed' }}>
@@ -909,7 +1011,7 @@ const OperatorSalary = () => {
               </div>
             </CCardBody>
           </CCard>
-        </CCol>
+        </CCol> */}
       </CRow>
 
 
@@ -930,11 +1032,11 @@ const OperatorSalary = () => {
   <button onClick={() => setSearchQuery('')}>✕</button>
 )} */}
 
-      <div className="position-relative" style={{ maxWidth: '400px', paddingBottom: '4px' }}>
+      <div className="position-relative" style={{ maxWidth: '400px', paddingBottom: '6px', marginBottom:'2px'}}>
         <input
           type="text"
           className="form-control pe-5"
-          placeholder="Search operator by name..."
+          placeholder="Search operator/helper by name..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
@@ -976,8 +1078,8 @@ const OperatorSalary = () => {
       <CCard className="shadow-sm border-0">
         <CCardHeader style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
           <div className="d-flex justify-content-between align-items-center">
-            <h5 className="mb-0 fw-bold">Operator Salary </h5>
-            <CBadge color="light" className="text-dark">{filteredOperators.length} Operators</CBadge>
+            <h5 className="mb-0 fw-bold"> {t("LABELS.operator_helper_salary")} </h5>
+            <CBadge color="light" className="text-dark">{filteredOperators.length} {t("LABELS.operator_helper")}</CBadge>
           </div>
         </CCardHeader>
         <CCardBody className="p-0">
@@ -987,14 +1089,14 @@ const OperatorSalary = () => {
             overflowX: 'auto',
           }}
           >
-            <CTable hover className="mb-0" style={{ height: '500px' }}>
+            <CTable hover className="mb-0" style={{ maxHeight: '500px', minHeight: 'auto' }}>
               <CTableHead style={{ background: '#f3f4f6' }}>
                 <CTableRow>
-                  <CTableHeaderCell className="fw-bold">Operator Name</CTableHeaderCell>
+                  <CTableHeaderCell className="fw-bold">Operator/Helper Name</CTableHeaderCell>
                   <CTableHeaderCell className="fw-bold">Base Salary</CTableHeaderCell>
                   <CTableHeaderCell className="fw-bold">Pending Expenses</CTableHeaderCell>
                   <CTableHeaderCell className="fw-bold">Net Advance</CTableHeaderCell>
-                  <CTableHeaderCell className="fw-bold">Settlements</CTableHeaderCell>
+                  {/* <CTableHeaderCell className="fw-bold">Settlements</CTableHeaderCell> */}
                   <CTableHeaderCell className="fw-bold text-center">Advance</CTableHeaderCell>
                   <CTableHeaderCell className="fw-bold text-center">History</CTableHeaderCell>
                   <CTableHeaderCell className="fw-bold text-center">Action</CTableHeaderCell>
@@ -1031,9 +1133,9 @@ const OperatorSalary = () => {
                           <CBadge color="success">Cleared</CBadge>
                         )}
                       </CTableDataCell>
-                      <CTableDataCell>
+                      {/* <CTableDataCell>
                         <CBadge color="info">{op.settlements.length} months</CBadge>
-                      </CTableDataCell>
+                      </CTableDataCell> */}
                       {/* <CTableDataCell className="text-center">
                         <CButton
                           color="primary"
@@ -1271,70 +1373,71 @@ const OperatorSalary = () => {
 
           {/* HISTORY */}
 
-          <div style={{maxHeight: '200px',
-          overflowY: 'auto',
-              overflowX: 'auto',
+          <div style={{
+            maxHeight: '200px',
+            overflowY: 'auto',
+            overflowX: 'auto',
           }}>
-  <CCard className="border-0 shadow-sm">
-            <CCardHeader style={{ background: '#f3f4f6' }}>
-              <h6 className="mb-0 fw-bold">Settlement History</h6>
-            </CCardHeader>
-            <CCardBody>
-              {activeOperator.settlements.length === 0 ? (
-                <div className="text-center text-muted py-4">
-                  <div style={{ fontSize: '3rem', opacity: 0.3 }}>📋</div>
-                  <p>No settlements recorded yet</p>
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <CTable hover className="mb-0">
-                    <CTableHead style={{ background: '#fafafa' }}>
-                      <CTableRow>
-                        <CTableHeaderCell>Month</CTableHeaderCell>
-                        <CTableHeaderCell>Amount Paid</CTableHeaderCell>
-                        <CTableHeaderCell>Expenses Deducted</CTableHeaderCell>
-                        <CTableHeaderCell>Advance Applied</CTableHeaderCell>
-                      </CTableRow>
-                    </CTableHead>
-                    <CTableBody>
-                      {activeOperator.settlements.map((s, i) => (
-                        <CTableRow key={i}>
-                          <CTableDataCell>
-                            <CBadge color="primary" style={{ fontSize: '0.9rem' }}>{s.month}</CBadge>
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            <span className="fw-bold text-success" style={{ fontSize: '1.1rem' }}>₹{(s.paid || 0).toLocaleString()}</span>
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            {s.expenses.length > 0 ? (
-                              <div className="d-flex flex-wrap gap-1">
-                                {s.expenses.map(e => (
-                                  <CBadge key={e.id} color="warning" className="text-dark">
-                                    {e.label}: ₹{e.amount}
-                                  </CBadge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted">None</span>
-                            )}
-                          </CTableDataCell>
-                          <CTableDataCell>
-                            {s.advanceApplied > 0 ? (
-                              <CBadge color="danger">₹{s.advanceApplied}</CBadge>
-                            ) : (
-                              <span className="text-muted">-</span>
-                            )}
-                          </CTableDataCell>
+            <CCard className="border-0 shadow-sm">
+              <CCardHeader style={{ background: '#f3f4f6' }}>
+                <h6 className="mb-0 fw-bold">Settlement History</h6>
+              </CCardHeader>
+              <CCardBody>
+                {activeOperator.settlements.length === 0 ? (
+                  <div className="text-center text-muted py-4">
+                    <div style={{ fontSize: '3rem', opacity: 0.3 }}>📋</div>
+                    <p>No settlements recorded yet</p>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <CTable hover className="mb-0">
+                      <CTableHead style={{ background: '#fafafa' }}>
+                        <CTableRow>
+                          <CTableHeaderCell>Month</CTableHeaderCell>
+                          <CTableHeaderCell>Amount Paid</CTableHeaderCell>
+                          <CTableHeaderCell>Expenses Deducted</CTableHeaderCell>
+                          <CTableHeaderCell>Advance Applied</CTableHeaderCell>
                         </CTableRow>
-                      ))}
-                    </CTableBody>
-                  </CTable>
-                </div>
-              )}
-            </CCardBody>
-          </CCard>
+                      </CTableHead>
+                      <CTableBody>
+                        {activeOperator.settlements.map((s, i) => (
+                          <CTableRow key={i}>
+                            <CTableDataCell>
+                              <CBadge color="primary" style={{ fontSize: '0.9rem' }}>{s.month}</CBadge>
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              <span className="fw-bold text-success" style={{ fontSize: '1.1rem' }}>₹{(s.paid || 0).toLocaleString()}</span>
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              {s.expenses > 0 ? (
+                                <div className="d-flex flex-wrap gap-1">
+                                  {/* {s.expenses.map(e => ( */}
+                                    <CBadge  color="warning" className="text-dark">
+                                       ₹{s.expenses}
+                                    </CBadge>
+                                  {/* ))} */}
+                                </div>
+                              ) : (
+                                <span className="text-muted">None</span>
+                              )}
+                            </CTableDataCell>
+                            <CTableDataCell>
+                              {s.advanceApplied > 0 ? (
+                                <CBadge color="danger">₹{s.advanceApplied}</CBadge>
+                              ) : (
+                                <span className="text-muted">-</span>
+                              )}
+                            </CTableDataCell>
+                          </CTableRow>
+                        ))}
+                      </CTableBody>
+                    </CTable>
+                  </div>
+                )}
+              </CCardBody>
+            </CCard>
           </div>
-        
+
         </CModal>
       )}
       {/* ---------------- ADVANCE MODAL ---------------- */}
@@ -1633,7 +1736,7 @@ const OperatorSalary = () => {
                                 size="sm"
                                 onClick={() => handleMarkAdvanceRepaid(selectedOperatorForAdvance.id, adv.id)}
                                 style={{ borderRadius: '20px' }}
-                                disabled={!repaymentAmounts[adv.id] || parseFloat(repaymentAmounts[adv.id]) <= 0}
+                                disabled={!repaymentAmounts[adv.id] || parseFloat(repaymentAmounts[adv.id]) < 0}
                               >
                                 Settle
                               </CButton>
