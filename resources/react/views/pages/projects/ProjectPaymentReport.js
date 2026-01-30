@@ -1150,6 +1150,9 @@ const ProjectPaymentReport = () => {
                                     onChange={e => setAdditionalAmount(e.target.value)}
                                     min="0"
                                 />
+                                {Number(additionalAmount) === 0 && additionalAmount !== '' && !useAdvance && (
+                                    <div className="text-danger small mt-1">Payment amount must be greater than 0</div>
+                                )}
                             </div>
 
                             <div className="mt-3 text-end">
@@ -1179,7 +1182,14 @@ const ProjectPaymentReport = () => {
                     }}>
                         Cancel
                     </CButton>
-                    <CButton color="primary" onClick={handleRepaymentSubmit} disabled={remaining <= 0}>
+                    <CButton
+                        color="primary"
+                        onClick={handleRepaymentSubmit}
+                        disabled={
+                            remaining <= 0 ||
+                            ((Number(additionalAmount) || 0) + (useAdvance ? (Number(advanceAmount) || 0) : 0) <= 0)
+                        }
+                    >
                         Submit
                     </CButton>
                 </CModalFooter>
@@ -1391,7 +1401,11 @@ const ProjectPaymentReport = () => {
                                             value={payAmount}
                                             onChange={e => setPayAmount(e.target.value)}
                                             min="0"
+                                            placeholder="Enter amount"
                                         />
+                                        {Number(payAmount) === 0 && payAmount !== '' && !useAdvance && (
+                                            <div className="text-danger small mt-1">Payment amount must be greater than 0</div>
+                                        )}
                                     </div>
 
                                     {/* <label className="form-label fw-semibold">Remark</label>
@@ -1433,7 +1447,11 @@ const ProjectPaymentReport = () => {
                     }}>Cancel</CButton>
                     <CButton
                         color="success"
-                        disabled={selectedPayment && (Number(selectedPayment.total) - Number(selectedPayment.paid_amount)) <= 0}
+                        disabled={
+                            (!selectedPayment) ||
+                            (Number(selectedPayment.total) - Number(selectedPayment.paid_amount) <= 0) ||
+                            ((Number(payAmount) || 0) + (useAdvance ? (Number(advanceAmount) || 0) : 0) <= 0)
+                        }
                         onClick={callPayment}
                     >
                         Confirm

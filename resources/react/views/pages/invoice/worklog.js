@@ -1209,7 +1209,7 @@ const MachineUsageForm = () => {
                                     ✕
                                   </CButton>
                                 )}
-                               {!workTypeSearchQuery[index] && <CButton
+                                {!workTypeSearchQuery[index] && <CButton
                                   type="button"
                                   color="primary"
                                   variant="outline"
@@ -1334,7 +1334,9 @@ const MachineUsageForm = () => {
                               </CCol>
                               <CCol md={2} className="text-center">
                                 <CFormLabel>Total Reading</CFormLabel>
-                                <p className="fw-bold fs-5 mb-0">{Math.max(reading.machine_end - reading.start_reading, 0).toFixed(2)}</p>
+                                <p className="fw-bold fs-5 mb-0">
+                                  {(Math.max((parseFloat(reading.machine_end) || 0) - (parseFloat(reading.start_reading) || 0), 0) || 0).toFixed(2)}
+                                </p>
                               </CCol>
                               <CCol sm={4}>
                                 {/* <CFormLabel>Readings</CFormLabel> */}
