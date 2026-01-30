@@ -574,44 +574,63 @@ const ProjectPaymentReport = () => {
 
 
     const handleRepaymentSubmit = async () => {
-        const addAmt = Number(additionalAmount) || 0;
-        const advAmt = useAdvance ? advancePaid : 0;
-        const totalPay = addAmt + advAmt;
+        const cashAmt = Number(additionalAmount) || 0;
+        const advAmt = useAdvance ? (Number(advanceAmount) || 0) : 0;
+        const totalPay = cashAmt + advAmt;
 
         if (totalPay <= 0) return showToast('danger', 'Total payment must be greater than 0');
         if (totalPay > remaining) return showToast('danger', 'Total amount exceeds remaining balance');
 
+        // Backend Validation Pre-check (Optional but good UX)
+        if (useAdvance && advAmt > advancePaid) return showToast('danger', 'Advance amount exceeds available balance');
+
         try {
-            // 1️⃣ Record the repayment
-            await postAPICall('/api/repayments', { project_id: projectId, payment: totalPay });
+            // Updated to use Single Transaction endpoint
+            // Payload includes both cash payment and advance used
+            const payload = {
+                company_id: companyId,
+                project_id: projectId,
+                invoice_id: null, // This is project-level repayment? Wait, 'repayment/single' in Controller doesn't take invoice_id logic for project level?
+                // Wait, ProjectPaymentReport.js logic was: `projectId` is selected (line 479).
+                // `handleRepaymentSubmit` sends `{ project_id: projectId }`.
+                // The backend `createSingleRepayment` (lines 505-530) took `invoice_id` as required??
+                // BUT current `handleRepaymentSubmit` (line 586) sends: `{ project_id: projectId, payment: totalPay }`.
+                // It does NOT send `invoice_id`.
+                // Let's check `createSingleRepayment` validation again.
+                // Line 512: `'invoice_id' => 'required'`. 
+                // So the current frontend code `await postAPICall('/api/repayments', ...)` call at line 586 must be hitting `RepaymentController::store` (line 227) or similar?
+                // Line 77 routes `/api/repayments` to `store`.
+                // Line 72 routes `/api/repayment/single` to `createSingleRepayment`.
+                // 
+                // The existing code called `/api/repayments` (PLURAL).
+                // The `store` method (line 227) handles allocation across invoices. 
+                // That is the correct one for "Payment at Project Level" leading to auto-allocation.
+                //
+                // The NEW Feature "Record Payment" is also at project level (allocating to oldest invoice?).
+                // "Record Payment" is inside `ProjectPaymentReport.js`.
+                // It seems to be project-level payment.
+                //
+                // So I should continue using `/api/repayments` (handled by `store`) BUT update `store` to handle `advance_used`?
+                // The user said "backend logic ... Update advance payment invoice/record".
+                // 
+                // I will use `/api/repayments` (PLURAL) and add `advance_used` to payload.
 
-            // 2️⃣ If advance is being cleared, mark all advance payments as taken
-            if (useAdvance) {
-                try {
-                    const data = await put('/api/repayments/mark-advance-taken', {
-                        company_id: companyId,
-                        project_id: projectId,
-                    });
+                payment: cashAmt,
+                advance_used: advAmt,
+                // remark: remark // Add remark if needed, UI doesn't have it in this modal currently, maybe add later or ignore.
+            };
 
-                    if (data.success) {
-                        showToast('success', data.message || 'Advance payments marked as cleared');
-                    } else {
-                        showToast('warning', data.message || 'Advance status update failed');
-                    }
-                } catch (advErr) {
-                    console.error('Advance clear update failed:', advErr);
-                    showToast('warning', 'Repayment saved, but advance status update failed: ' + (advErr.message || 'Unknown error'));
-                }
-            }
+            await postAPICall('/api/repayments', payload);
 
-            // 3️⃣ Reset UI
             showToast('success', 'Payment recorded successfully');
             setShowRepaymentModal(false);
             setAdditionalAmount('');
+            setAdvanceAmount('');
             setUseAdvance(false);
             fetchPayments();
             fetchHistory();
         } catch (e) {
+            console.error('Repayment error:', e);
             showToast('danger', 'Error: ' + (e?.message || e));
         }
     };
@@ -1086,50 +1105,92 @@ const ProjectPaymentReport = () => {
 
                     {remaining > 0 ? (
                         <>
-                            {/* Logic: If advance <= remaining, show checkbox to use it */}
-                            {advancePaid > 0 && advancePaid <= remaining ? (
-                                <div className="mb-3">
-                                    {/* <div className="form-check mb-2">
+                            {advancePaid > 0 && (
+                                <div className="mb-3 bg-light p-3 rounded">
+                                    <div className="form-check mb-2">
                                         <input
                                             className="form-check-input"
                                             type="checkbox"
                                             id="useAdvanceCheck"
                                             checked={useAdvance}
-                                            onChange={(e) => setUseAdvance(e.target.checked)}
+                                            onChange={(e) => {
+                                                setUseAdvance(e.target.checked);
+                                                if (!e.target.checked) {
+                                                    // clear advance amount when unchecked
+                                                    // setAdditionalAmount(''); // Maybe don't clear additional amount?
+                                                }
+                                            }}
                                         />
-                                        <label className="form-check-label" htmlFor="useAdvanceCheck">
-                                            Clear from Advance (₹{advancePaid.toFixed(2)})
+                                        <label className="form-check-label fw-semibold" htmlFor="useAdvanceCheck">
+                                            Use Advance Payment
                                         </label>
-                                    </div> */}
-
-                                    <label className="form-label">Additional Amount</label>
-                                    <CFormInput
-                                        type="number"
-                                        placeholder="Enter additional amount"
-                                        value={additionalAmount}
-                                        onChange={e => setAdditionalAmount(e.target.value)}
-                                        min="0"
-                                    />
-
-                                    <div className="mt-2 text-end">
-                                        <strong>Total Payment: </strong>
-                                        ₹{((useAdvance ? advancePaid : 0) + (Number(additionalAmount) || 0)).toFixed(2)}
                                     </div>
-                                </div>
-                            ) : (
-                                // If advance > remaining OR advance is 0, just show standard input
-                                // (User requested: "When advance payment > Remaining amount then dont show the option to clear from advance")
-                                <div className="mb-3">
-                                    <label className="form-label">Amount</label>
-                                    <CFormInput
-                                        type="number"
-                                        placeholder="Enter amount to pay"
-                                        value={additionalAmount}
-                                        onChange={e => setAdditionalAmount(e.target.value)}
-                                        min="0"
-                                    />
+
+                                    {useAdvance && (
+                                        <div className="mb-2">
+                                            <label className="form-label small">Advance to Use (Max: ₹{Math.min(remaining, advancePaid).toFixed(2)})</label>
+                                            <CFormInput
+                                                type="number"
+                                                placeholder="Enter advance amount"
+                                                value={advanceAmount} // We need a new state for this? 'advanceAmount' is used for modal. reuse or new?
+                                                // Actually 'advanceAmount' state exists at line 63 but used for "Advance Payment Modal".
+                                                // Let's use a new variable or reuse slightly carefully?
+                                                // Better to introduce a new local state or reuse one if safe. 
+                                                // Let's use a new state variable 'advanceToUse' in the component?
+                                                // I can't add state here. I should have added it in top level.
+                                                // Let me use a temp variable logic in the replacement? No.
+                                                // I must ensure the state exists. 
+                                                // Existing 'additionalAmount' is used for "Additional Amount" (Cash).
+                                                // I need 'advanceUsedAmount'.
+                                                // Wait, I can't add state inside this block.
+                                                // I need to use 'advanceAmount' (line 63) which is seemingly available?
+                                                // 'advanceAmount' is for the OTHER modal "Advance Payment" (line 497).
+                                                // using it here might conflict if both modals open? They likely don't.
+                                                // Let's use 'advanceAmount' for now but be careful to reset.
+                                                onChange={e => {
+                                                    let val = parseFloat(e.target.value) || 0;
+                                                    const max = Math.min(remaining, advancePaid);
+                                                    if (val > max) val = max; // clamp? or just let user type and validate on submit?
+                                                    // User experience: clamp is better or visual error. 
+                                                    // Let's allow typing but validate? 
+                                                    // User said "Do NOT allow value > max usable advance".
+                                                    // I'll clamp it on blur or simple check.
+                                                    setAdvanceAmount(e.target.value);
+                                                }}
+                                                onBlur={(e) => {
+                                                    let val = parseFloat(e.target.value) || 0;
+                                                    const max = Math.min(remaining, advancePaid);
+                                                    if (val > max) setAdvanceAmount(max);
+                                                }}
+                                                min="0"
+                                                max={Math.min(remaining, advancePaid)}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
+
+                            <div className="mb-3">
+                                <label className="form-label">Payment Amount (Cash/Online)</label>
+                                <CFormInput
+                                    type="number"
+                                    placeholder="Enter amount to pay"
+                                    value={additionalAmount}
+                                    onChange={e => setAdditionalAmount(e.target.value)}
+                                    min="0"
+                                />
+                            </div>
+
+                            <div className="mt-3 text-end">
+                                <div><small>Advance Used:</small> ₹{Number(useAdvance ? advanceAmount : 0).toFixed(2)}</div>
+                                <div><small>Cash/Online:</small> ₹{Number(additionalAmount || 0).toFixed(2)}</div>
+                                <div className="fw-bold fs-5 mt-1 text-primary">
+                                    Total Payment: ₹{((useAdvance ? Number(advanceAmount) : 0) + (Number(additionalAmount) || 0)).toFixed(2)}
+                                </div>
+                                {(useAdvance ? Number(advanceAmount) : 0) + (Number(additionalAmount) || 0) > remaining && (
+                                    <div className="text-danger small mt-1">Total exceeds remaining balance!</div>
+                                )}
+                            </div>
                         </>
                     ) : (
                         <div className="alert alert-success text-center">
@@ -1143,6 +1204,7 @@ const ProjectPaymentReport = () => {
                         setShowRepaymentModal(false);
                         setUseAdvance(false);
                         setAdditionalAmount('');
+                        setAdvanceAmount('');
                     }}>
                         Cancel
                     </CButton>

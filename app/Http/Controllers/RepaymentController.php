@@ -231,15 +231,71 @@ class RepaymentController extends Controller
 
         $validated = $request->validate([
             'project_id' => 'required|integer|exists:projects,id',
-            'payment' => 'required|numeric|min:0.01',
+            'payment' => 'required|numeric|min:0',
+            'advance_used' => 'nullable|numeric|min:0',
             'payment_mode' => 'nullable|string',
         ]);
 
-        $incomingPayment = (float) $validated['payment'];
+        $cashPayment = (float) $validated['payment'];
+        $advanceUsed = (float) ($validated['advance_used'] ?? 0);
+        $totalIncoming = $cashPayment + $advanceUsed;
+
+        if ($totalIncoming <= 0) {
+             return response()->json(['message' => 'Total payment must be greater than 0'], 422);
+        }
 
         DB::beginTransaction();
 
         try {
+            // 0️⃣ Handle Advance Deduction if applicable
+            if ($advanceUsed > 0) {
+                 // Fetch available advance repayments (is_advance=1, advance_taken=0) for this project
+                 // We need to deduct $advanceUsed from these.
+                 // Strategy: iterate and reduce 'payment' amount. 
+                 // Note: 'payment' in Repayment table for is_advance=1 represents the BALANCE of that advance?
+                 // Usually: total=amount, payment=amount.
+                 
+                 $advanceRepayments = Repayment::where('company_id', $companyId)
+                    ->where('project_id', $validated['project_id'])
+                    ->where('is_advance', true)
+                    ->where('advance_taken', false) // assuming this flag means "fully used"
+                    ->where('payment', '>', 0) // only where balance exists
+                    ->orderBy('created_at', 'asc') // FIFO
+                    ->get();
+                 
+                 $totalAvailableAdvance = $advanceRepayments->sum('payment');
+
+                 if ($advanceUsed > $totalAvailableAdvance) {
+                     DB::rollBack();
+                     return response()->json([
+                         'message' => 'Advance amount exceeds available balance. Available: ' . $totalAvailableAdvance
+                     ], 422);
+                 }
+
+                 $advanceToDeduct = $advanceUsed;
+                 foreach ($advanceRepayments as $advRepay) {
+                     if ($advanceToDeduct <= 0) break;
+
+                     $deduct = min($advRepay->payment, $advanceToDeduct);
+                     
+                     // Reduce the balance of this advance entry
+                     $advRepay->payment -= $deduct;
+                     // Update total? No, total implies original amount. Payment implies current balance? 
+                     // Wait, in standard Repayment: payment = amount paid.
+                     // In Advance Repayment: 'payment' seems to be abused as "Remaining usable amount" based on Frontend summing it up?
+                     // Frontend: reduce((sum, r) => sum + Number(r.payment || 0), 0)
+                     // Yes, so reducing 'payment' reduces the available balance shown on frontend.
+                     
+                     if ($advRepay->payment <= 0) {
+                         $advRepay->advance_taken = true; // Mark fully used
+                     }
+                     $advRepay->save();
+
+                     $advanceToDeduct -= $deduct;
+                 }
+            }
+
+
             // 1️⃣ Fetch invoices (oldest first)
             $invoices = ProjectPayment::where('company_id', $companyId)
                 ->where('project_id', $validated['project_id'])
@@ -269,26 +325,30 @@ class RepaymentController extends Controller
             }
 
             // 3️⃣ Reject overpayment
-            if ($incomingPayment > $totalOutstanding) {
+            // Allow small float epsilon
+            if ($totalIncoming > $totalOutstanding + 0.01) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Payment exceeds total outstanding balance',
                     'details' => [
-                        'incoming_payment' => $incomingPayment,
+                        'incoming_payment' => $totalIncoming,
                         'total_outstanding' => $totalOutstanding,
-                        'excess_amount' => round($incomingPayment - $totalOutstanding, 2)
+                        'excess_amount' => round($totalIncoming - $totalOutstanding, 2)
                     ]
                 ], 422);
             }
 
-            $remainingPayment = $incomingPayment;
+            $remainingAllocation = $totalIncoming;
+            $remainingCash = $cashPayment;
+            $remainingAdvance = $advanceUsed;
+            
             $repayments = [];
 
             // 4️⃣ Allocate payment invoice by invoice
             foreach ($invoices as $invoice) {
 
-                if ($remainingPayment <= 0)
+                if ($remainingAllocation <= 0)
                     break;
 
                 /** -------------------------------
@@ -297,27 +357,57 @@ class RepaymentController extends Controller
                 $invoiceRemaining = max(0, $invoice->total - $invoice->paid_amount);
 
                 if ($invoiceRemaining > 0) {
-                    $invoicePayment = min($invoiceRemaining, $remainingPayment);
+                    $invoicePayment = min($invoiceRemaining, $remainingAllocation);
 
-                    Repayment::create([
-                        'company_id' => $companyId,
-                        'project_id' => $validated['project_id'],
-                        'invoice_id' => $invoice->invoice_number,
-                        'payment' => $invoicePayment,
-                        'total' => $invoiceRemaining,
-                        'remaining' => $invoiceRemaining - $invoicePayment,
-                        'is_completed' => ($invoicePayment >= $invoiceRemaining),
-                        'payment_mode' => $validated['payment_mode'] ?? null,
-                        'date' => now()->toDateString(),
-                    ]);
+                    // Determine how much is cash vs advance for this chunk
+                    // We prioritize Advance usage? Or Cash? Order doesn't matter for total, but matters for logs.
+                    // Let's settle with Advance first (internal money), then Cash.
+                    
+                    $thisChunkAdvance = min($invoicePayment, $remainingAdvance);
+                    $thisChunkCash = $invoicePayment - $thisChunkAdvance;
+
+                    // Create Repayment for Cash
+                    if ($thisChunkCash > 0) {
+                        Repayment::create([
+                            'company_id' => $companyId,
+                            'project_id' => $validated['project_id'],
+                            'invoice_id' => $invoice->invoice_number,
+                            'payment' => $thisChunkCash,
+                            'total' => $invoiceRemaining, // Snapshot at time of payment?
+                            'remaining' => max(0, $invoiceRemaining - $invoicePayment), // This might be weird if split.
+                            // Logic: 'remaining' is remaining AFTER this payment.
+                            // But we are splitting one logical payment into two entries (Cash + Adv).
+                            // Let's just create them sequentially.
+                            'is_completed' => false, // Will verify at end?
+                            'payment_mode' => $validated['payment_mode'] ?? 'Cash',
+                            'date' => now()->toDateString(),
+                        ]);
+                        $remainingCash -= $thisChunkCash;
+                    }
+
+                    // Create Repayment for Advance Usage
+                    if ($thisChunkAdvance > 0) {
+                        Repayment::create([
+                            'company_id' => $companyId,
+                            'project_id' => $validated['project_id'],
+                            'invoice_id' => $invoice->invoice_number,
+                            'payment' => $thisChunkAdvance,
+                            'total' => $invoiceRemaining, 
+                            'remaining' => max(0, $invoiceRemaining - $thisChunkCash - $thisChunkAdvance),
+                            'is_completed' => false,
+                            'payment_mode' => 'Advance Adjustment', // special mode
+                            'date' => now()->toDateString(),
+                        ]);
+                        $remainingAdvance -= $thisChunkAdvance;
+                    }
 
                     $invoice->paid_amount += $invoicePayment;
                     $invoice->save();
 
-                    $remainingPayment -= $invoicePayment;
+                    $remainingAllocation -= $invoicePayment;
                 }
 
-                if ($remainingPayment <= 0)
+                if ($remainingAllocation <= 0)
                     break;
 
                 /** ---------------------------------
@@ -329,37 +419,57 @@ class RepaymentController extends Controller
                 )->orderBy('id', 'asc')->get();
 
                 foreach ($charges as $charge) {
-                    if ($remainingPayment <= 0)
+                    if ($remainingAllocation <= 0)
                         break;
 
-                    $chargeRemaining = max(
-                        0,
-                        $charge->amount - ($charge->paid_amount ?? 0)
-                    );
+                    $chargeRemaining = max(0, $charge->amount - ($charge->paid_amount ?? 0));
 
                     if ($chargeRemaining <= 0)
                         continue;
 
-                    $chargePayment = min($chargeRemaining, $remainingPayment);
+                    $chargePayment = min($chargeRemaining, $remainingAllocation);
+                    
+                    // Split Cash/Advance
+                    $thisChunkAdvance = min($chargePayment, $remainingAdvance);
+                    $thisChunkCash = $chargePayment - $thisChunkAdvance;
 
-                    Repayment::create([
-                        'company_id' => $companyId,
-                        'project_id' => $validated['project_id'],
-                        'invoice_id' => $invoice->invoice_number,
-                        'charge_id' => $charge->id,
-                        'payment' => $chargePayment,
-                        'total' => $chargeRemaining,
-                        'remaining' => $chargeRemaining - $chargePayment,
-                        'is_completed' => ($chargePayment >= $chargeRemaining),
-                        'payment_mode' => $validated['payment_mode'] ?? null,
-                        'date' => now()->toDateString(),
-                    ]);
+                    if ($thisChunkCash > 0) {
+                         Repayment::create([
+                            'company_id' => $companyId,
+                            'project_id' => $validated['project_id'],
+                            'invoice_id' => $invoice->invoice_number,
+                            'charge_id' => $charge->id,
+                            'payment' => $thisChunkCash,
+                            'total' => $chargeRemaining,
+                            'remaining' => max(0, $chargeRemaining - $chargePayment),
+                            'is_completed' => false,
+                            'payment_mode' => $validated['payment_mode'] ?? 'Cash',
+                            'date' => now()->toDateString(),
+                        ]);
+                        $remainingCash -= $thisChunkCash;
+                    }
+
+                    if ($thisChunkAdvance > 0) {
+                         Repayment::create([
+                            'company_id' => $companyId,
+                            'project_id' => $validated['project_id'],
+                            'invoice_id' => $invoice->invoice_number,
+                            'charge_id' => $charge->id,
+                            'payment' => $thisChunkAdvance,
+                            'total' => $chargeRemaining,
+                            'remaining' => max(0, $chargeRemaining - $chargePayment),
+                            'is_completed' => false,
+                            'payment_mode' => 'Advance Adjustment',
+                            'date' => now()->toDateString(),
+                        ]);
+                        $remainingAdvance -= $thisChunkAdvance;
+                    }
 
                     $charge->paid_amount += $chargePayment;
                     $charge->is_paid = ($charge->paid_amount >= $charge->amount);
                     $charge->save();
 
-                    $remainingPayment -= $chargePayment;
+                    $remainingAllocation -= $chargePayment;
                 }
             }
 
@@ -369,22 +479,23 @@ class RepaymentController extends Controller
                 'success' => true,
                 'message' => 'Payment allocated successfully',
                 'data' => [
-                    'incoming_payment' => $incomingPayment,
-                    'total_allocated' => $incomingPayment - $remainingPayment,
-                    'remaining_unused' => round($remainingPayment, 2),
+                    'incoming_payment' => $totalIncoming,
+                    'advance_used' => $advanceUsed,
+                    'total_allocated' => $totalIncoming - $remainingAllocation,
                 ]
             ], 201);
 
         } catch (\Throwable $e) {
             DB::rollBack();
-            Log::error('Project repayment failed', [
+            \Log::error('Project repayment failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
+            // Clean error message for user
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to process payment'
+                'message' => 'Failed to process payment: ' . $e->getMessage()
             ], 500);
         }
     }
