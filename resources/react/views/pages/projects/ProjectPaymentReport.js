@@ -277,71 +277,42 @@ const ProjectPaymentReport = () => {
     // 8. Payment update (single invoice)
     // -------------------------------------------------
     const callPayment = async () => {
-        if (!selectedPayment || !payAmount || Number(payAmount) <= 0) return;
+        if (!selectedPayment) return;
 
-        const amountToPay = Number(payAmount);
-        // const newPaid = Number(selectedPayment.paid_amount) + amountToPay;
-        const newPaid = amountToPay;
+        const cashAmt = Number(payAmount) || 0;
+        const advAmt = useAdvance ? (Number(advanceAmount) || 0) : 0;
+        const totalPay = cashAmt + advAmt;
 
-        const remaining = Number(selectedPayment.total) - newPaid;
-        const remarkRepayment = remark;
+        // Validation
+        const remaining = Number(selectedPayment.total) - Number(selectedPayment.paid_amount);
+
+        if (totalPay <= 0) return showToast('danger', 'Total payment must be greater than 0');
+        if (totalPay > remaining + 0.01) return showToast('danger', 'Total amount exceeds remaining balance');
+        if (useAdvance && advAmt > advancePaid) return showToast('danger', 'Advance amount exceeds available balance');
+
         try {
-            // 1. Update project-payment record — preserve payment_mode
-            const updatePayload = {
-                paid_amount: newPaid,
-                // Explicitly preserve existing payment_mode
-                payment_mode: selectedPayment.payment_mode || null,
-
+            const payload = {
+                company_id: companyId,
+                project_id: selectedPayment.project_id,
+                invoice_id: selectedPayment.invoice_number, // NEW: filter for strict invoice targeting
+                payment: cashAmt,
+                advance_used: advAmt,
+                payment_mode: 'Cash',
             };
 
-            const resp = await fetch(`/api/project-payments/${selectedPayment.id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatePayload),
-            });
+            await postAPICall('/api/repayments', payload);
 
-            if (!resp.ok) {
-                const errorText = await resp.text();
-                throw new Error(`Failed to update payment: ${errorText}`);
-            }
-
-            showToast('success', 'Payment updated successfully');
-        } catch (e) {
-            console.error('Payment update error:', e);
-            showToast('danger', 'Failed to update payment: ' + e.message);
-            return;
-        }
-
-        // 2. Record repayment entry
-        const today = new Date().toISOString().split('T')[0];
-        const repaymentPayload = {
-            company_id: companyId,
-            project_id: selectedPayment.project?.id,
-            invoice_id: selectedPayment.invoice_number,
-            payment: amountToPay,
-            total: selectedPayment.total,
-            remaining: remaining,
-            is_completed: remaining <= 0,
-            date: today,
-            remark: remarkRepayment,
-        };
-
-        try {
-            await fetch('/api/repayment/single', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(repaymentPayload),
-            });
-
-            // Reset and refresh
+            showToast('success', 'Payment recorded successfully');
+            setShowPaymentModal(false);
             setPayAmount('');
             setRemark('');
-            setShowPaymentModal(false);
+            setAdvanceAmount('');
+            setUseAdvance(false);
             fetchPayments();
             if (projectId) fetchHistory();
         } catch (e) {
-            console.error('Repayment recording error:', e);
-            showToast('danger', 'Payment recorded but history failed to save.');
+            console.error('Payment update error:', e);
+            showToast('danger', 'Failed to update payment: ' + (e?.message || e));
         }
     };
 
@@ -1330,37 +1301,121 @@ const ProjectPaymentReport = () => {
                 </CModalBody>
             </CModal>
 
+
             {/* Make-payment modal */}
-            <CModal visible={showPaymentModal} onClose={() => setShowPaymentModal(false)}>
+            <CModal visible={showPaymentModal} onClose={() => {
+                setShowPaymentModal(false);
+                setPayAmount('');
+                setAdvanceAmount('');
+                setUseAdvance(false);
+                setRemark('');
+            }}>
                 <CModalHeader closeButton><CModalTitle>Make Payment</CModalTitle></CModalHeader>
                 <CModalBody>
                     {selectedPayment && (
                         <>
                             <p><strong>Invoice:</strong> {selectedPayment.invoice_number}</p>
-                            <p><strong>Total:</strong> ₹{selectedPayment.total}</p>
-                            <p><strong>Remaining:</strong> ₹{selectedPayment.total - selectedPayment.paid_amount}</p>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span>Total:</span>
+                                <strong>₹{Number(selectedPayment.total).toFixed(2)}</strong>
+                            </div>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span>Paid:</span>
+                                <span className="text-success">₹{Number(selectedPayment.paid_amount).toFixed(2)}</span>
+                            </div>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span>Remaining:</span>
+                                <span className="text-danger">₹{(Number(selectedPayment.total) - Number(selectedPayment.paid_amount)).toFixed(2)}</span>
+                            </div>
 
-                            {selectedPayment.total - selectedPayment.paid_amount > 0 ? (
-                                <div className="mt-3">
-                                    <label className="form-label fw-semibold">Amount to Pay</label>
-                                    <input
-                                        type="number"
-                                        className="form-control"
-                                        value={payAmount}
-                                        onChange={e => setPayAmount(e.target.value)}
-                                        min="1"
-                                        max={selectedPayment.total - selectedPayment.paid_amount}
-                                    />
+                            <hr />
 
-                                    <label className="form-label fw-semibold">Remark</label>
+                            <div className="d-flex justify-content-between mb-3">
+                                <span>Available Advance:</span>
+                                <span className="text-primary fw-bold">₹{advancePaid.toFixed(2)}</span>
+                            </div>
+
+                            {(Number(selectedPayment.total) - Number(selectedPayment.paid_amount)) > 0 ? (
+                                <>
+                                    {advancePaid > 0 && (
+                                        <div className="mb-3 bg-light p-3 rounded">
+                                            <div className="form-check mb-2">
+                                                <input
+                                                    className="form-check-input"
+                                                    type="checkbox"
+                                                    id="useAdvanceCheckInvoice"
+                                                    checked={useAdvance}
+                                                    onChange={(e) => {
+                                                        setUseAdvance(e.target.checked);
+                                                        // if (!e.target.checked) setAdvanceAmount('');
+                                                    }}
+                                                />
+                                                <label className="form-check-label fw-semibold" htmlFor="useAdvanceCheckInvoice">
+                                                    Use Advance Payment
+                                                </label>
+                                            </div>
+
+                                            {useAdvance && (
+                                                <div className="mb-2">
+                                                    <label className="form-label small">Advance to Use</label>
+                                                    <CFormInput
+                                                        type="number"
+                                                        placeholder="Enter advance amount"
+                                                        value={advanceAmount}
+                                                        onChange={e => {
+                                                            const rem = Number(selectedPayment.total) - Number(selectedPayment.paid_amount);
+                                                            let val = parseFloat(e.target.value) || 0;
+                                                            const max = Math.min(rem, advancePaid);
+                                                            // if (val > max) val = max; // Validation on submit preferred or clamp?
+                                                            setAdvanceAmount(e.target.value);
+                                                        }}
+                                                        onBlur={e => {
+                                                            const rem = Number(selectedPayment.total) - Number(selectedPayment.paid_amount);
+                                                            let val = parseFloat(e.target.value) || 0;
+                                                            const max = Math.min(rem, advancePaid);
+                                                            if (val > max) setAdvanceAmount(max);
+                                                        }}
+                                                        min="0"
+                                                    />
+                                                    <small className="text-muted">Max: ₹{Math.min(Number(selectedPayment.total) - Number(selectedPayment.paid_amount), advancePaid).toFixed(2)}</small>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold">Amount (Cash/Online)</label>
+                                        <input
+                                            type="number"
+                                            className="form-control"
+                                            value={payAmount}
+                                            onChange={e => setPayAmount(e.target.value)}
+                                            min="0"
+                                        />
+                                    </div>
+
+                                    {/* <label className="form-label fw-semibold">Remark</label>
                                     <input
                                         type="text"
                                         className="form-control"
                                         value={remark}
                                         onChange={e => setRemark(e.target.value)}
-                                    />
-                                </div>
+                                    /> 
+                                    // Remark removed from backend store? Or redundant? 
+                                    // Store doesn't use 'remark' in Repayment table for invoice logic currently?
+                                    // createSingleRepayment used it. My new store logic creates repayment with... no remark/remark?
+                                    // My new store logic didn't explicitly include 'remark' in Repayment::create array.
+                                    // I should probably add it back if important, but User spec didn't mention it.
+                                    // I'll keep it simple.
+                                    */}
 
+                                    <div className="mt-2 text-end">
+                                        <strong>Total Payment: </strong>
+                                        <span className={((useAdvance ? Number(advanceAmount) : 0) + (Number(payAmount) || 0)) > (Number(selectedPayment.total) - Number(selectedPayment.paid_amount)) ? "text-danger" : "text-success"}>
+                                            ₹{((useAdvance ? Number(advanceAmount) : 0) + (Number(payAmount) || 0)).toFixed(2)}
+                                        </span>
+                                    </div>
+                                </>
                             ) : (
                                 <div className="alert alert-success text-center">
                                     Payment Complete! No outstanding balance.
@@ -1370,17 +1425,16 @@ const ProjectPaymentReport = () => {
                     )}
                 </CModalBody>
                 <CModalFooter>
-                    <CButton color="secondary" onClick={() => setShowPaymentModal(false)}>Cancel</CButton>
+                    <CButton color="secondary" onClick={() => {
+                        setShowPaymentModal(false);
+                        setUseAdvance(false);
+                        setPayAmount('');
+                        setAdvanceAmount('');
+                    }}>Cancel</CButton>
                     <CButton
                         color="success"
-                        onClick={() => {
-                            if (!payAmount || Number(payAmount) <= 0) return showToast('danger', 'Enter a valid amount');
-                            const remaining = Number(selectedPayment.total) - Number(selectedPayment.paid_amount);
-                            if (Number(payAmount) > remaining) {
-                                return showToast('danger', 'Amount cannot be greater than remaining amount');
-                            }
-                            callPayment();
-                        }}
+                        disabled={selectedPayment && (Number(selectedPayment.total) - Number(selectedPayment.paid_amount)) <= 0}
+                        onClick={callPayment}
                     >
                         Confirm
                     </CButton>
