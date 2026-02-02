@@ -308,24 +308,26 @@ const OrderList = ({ projectId, inModal = false }) => {
     // const remaining = orders?.total - orders?.paid_amount;
     // const isCompleted = remaining <= 0;
 
-    // Calculate additional charges totals
+    // Calculate additional charges totals for display
     const additionalChargesTotal = additionalCharges.reduce((sum, charge) =>
         sum + Number(charge.amount || 0), 0
     );
 
-    const additionalChargesPaid = additionalCharges.reduce((sum, charge) =>
-        sum + Number(charge.paid_amount || 0), 0
-    );
+    // Trust backend provided totals
+    // If backend provides 'grand_total', use it. Otherwise fallback (carefully).
+    // Our updated backend provides 'grand_total', 'paid_amount' (total paid), 'work_order_amount' (base_total).
 
-    // Calculate grand total including additional charges
-    const baseTotal = Number(orders?.base_total || 0);
-    const basePaid = Number(orders?.paid_amount || 0);
+    const baseTotal = Number(orders?.work_order_amount || orders?.base_total || 0);
+    const grandTotal = Number(orders?.grand_total || orders?.total || (baseTotal + additionalChargesTotal));
 
-    const grandTotal = baseTotal + additionalChargesTotal;
-    const totalPaidAmount = basePaid + additionalChargesPaid;
-    const remaining = grandTotal - totalPaidAmount;
+    // 'paid_amount' from backend is now the authoritative TOTAL paid. 
+    // Do NOT add additionalChargesPaid to it again.
+    const totalPaidAmount = Number(orders?.paid_amount || 0);
 
-    const isCompleted = remaining <= 0;
+    // Use backend remaining or calculate
+    const remaining = Number(orders?.remaining !== undefined ? orders.remaining : (grandTotal - totalPaidAmount));
+
+    const isCompleted = remaining <= 0.01;
 
     return (
         <div className="p-4">

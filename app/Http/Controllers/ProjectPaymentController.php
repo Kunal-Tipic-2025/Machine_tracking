@@ -150,8 +150,12 @@ class ProjectPaymentController extends Controller
 
     private function enrichPaymentWithCharges($payment)
     {
-        $additionalChargesTotal = $payment->additionalCharges->sum('amount');
-        $additionalChargesPaid = $payment->additionalCharges->sum('paid_amount');
+        // Use InvoiceService for consistent calculation
+        $service = new \App\Services\InvoiceService();
+        $totals = $service->calculateInvoiceTotals($payment);
+
+        // Combine relationships
+        $payment->loadMissing(['project', 'company', 'additionalCharges']);
 
         return [
             'id' => $payment->id,
@@ -162,26 +166,39 @@ class ProjectPaymentController extends Controller
             'is_fixed_bid' => $payment->is_fixed_bid,
             'payment_mode' => $payment->payment_mode,
             'created_at' => $payment->created_at,
-            // ✅ ADD THIS LINE - Include worklog_ids
             'worklog_ids' => $payment->worklog_ids,
+            'transaction_id' => $payment->transaction_id,
+            'remark' => $payment->remark,
 
-            // Original amounts
-            'base_total' => $payment->total,
-            'base_paid_amount' => $payment->paid_amount,
+            // Standardized Fields from Service
+            'work_order_amount' => $totals['work_order_amount'], // Base Work Order
+            'additional_charges_total' => $totals['additional_charges_total'],
+            'additional_charges_paid' => $totals['additional_charges_paid'],
+            
+            'grand_total' => $totals['grand_total'],
+            'paid_amount' => $totals['total_paid'],
+            'remaining' => $totals['remaining_amount'],
+            'status' => $totals['status'],
 
-            // Additional charges
-            'additional_charges_total' => $additionalChargesTotal,
-            'additional_charges_paid' => $additionalChargesPaid,
-
-            // Combined totals
-            'total' => $payment->total + $additionalChargesTotal,
-            'paid_amount' => $payment->paid_amount + $additionalChargesPaid,
-            'remaining' => ($payment->total + $additionalChargesTotal) - ($payment->paid_amount + $additionalChargesPaid),
-
-            // Include relationships
+            // Legacy/Frontend Compatibility
+            'base_total' => $totals['work_order_amount'],
+            'base_paid_amount' => $totals['work_order_paid'], // Corrected base paid
+            'total' => $totals['grand_total'], // Frontend expects 'total' to be Grand Total usually?
+                                               // User said "Work Orders Subtotal: 2400", "Grand Total: 3400".
+                                               // Frontend 'baseTotal' expects Work Order Amount.
+                                               // Let's check OrderList.js usage.
+                                               // OrderList.js: const baseTotal = Number(orders?.base_total || 0);
+                                               // So base_total should be Work Order Amount.
+                                               // OrderList.js: const grandTotal = baseTotal + additionalChargesTotal;
+                                               // So 'total' field implies... ?
+                                               // In OrderList.js line 214: totalAmount: orders.total
+                                               // Let's ensure 'total' is Grand Total for consistency.
+            
+            // Relationships
             'project' => $payment->project,
             'company' => $payment->company,
             'additionalCharges' => $payment->additionalCharges,
+            'repayments' => $payment->repayments,
         ];
     }
 
