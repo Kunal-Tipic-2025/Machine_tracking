@@ -152,10 +152,10 @@ const MachineExpenses = () => {
       .reduce((sum, log) => {
         const start = parseFloat(log.start_reading);
         const end = parseFloat(log.end_reading);
-       if (!isNaN(start) && !isNaN(end) && end > start ) {
-      return sum + (end - start);
-    }
-    return sum;
+        if (!isNaN(start) && !isNaN(end) && end > start) {
+          return sum + (end - start);
+        }
+        return sum;
       }, 0);
   };
 
@@ -165,7 +165,11 @@ const MachineExpenses = () => {
         const matchesMachine = Number(expense.machine_id) === Number(machineId);
         const category = String(expense.expense_type?.expense_category || '').toLowerCase();
         const nameText = String(expense.expense_type?.name || '').toLowerCase();
-        const isMachineCategory = category.includes('machine') || nameText.includes('machine');
+
+        // Expanded check matching NewExpense.js logic
+        const keywords = ['machine', 'diesel', 'desile', 'maintenance', 'repair'];
+        const isMachineCategory = keywords.some(k => category.includes(k) || nameText.includes(k));
+
         return matchesMachine && isMachineCategory;
       })
       .reduce((sum, expense) => sum + (parseFloat(expense.total_price) || 0), 0);
@@ -279,10 +283,10 @@ const MachineExpenses = () => {
   }, [filteredMachines]);
 
   const totalWorkingHours = useMemo(() => {
-  return filteredMachines.reduce((sum, machine) => {
-    return sum + Number(machine.totalHours || 0);
-  }, 0);
-}, [filteredMachines]);
+    return filteredMachines.reduce((sum, machine) => {
+      return sum + Number(machine.totalHours || 0);
+    }, 0);
+  }, [filteredMachines]);
 
   // Export to Excel
   const exportToExcel = () => {
@@ -429,11 +433,11 @@ const MachineExpenses = () => {
           </div>
         </div>
 
-        <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0',  display: 'flex', justifyContent:'space-between'}}>
+        <div style={{ marginBottom: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between' }}>
           <span style={{ color: '#28a745' }}>
             Earning: {formatCurrency(machine.profit)}
           </span>
-           <span style={{ color: 'blue' }}>
+          <span style={{ color: 'blue' }}>
             Hours: {(machine.totalHours)}
           </span>
         </div>
@@ -677,7 +681,7 @@ const MachineExpenses = () => {
                               <CTableDataCell className="text-end">
                                 <span style={{ color: '#dc3545' }}>{formatIndianNumber(m.expense)}</span>
                               </CTableDataCell>
-                              
+
 
                               <CTableDataCell className="text-end">
                                 <span

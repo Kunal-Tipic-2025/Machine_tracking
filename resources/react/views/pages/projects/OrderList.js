@@ -224,12 +224,12 @@ const OrderList = ({ projectId, inModal = false }) => {
             const formData = {
                 invoice_number: orders.invoice_number,
                 date: invoiceDate,
-                customer: {
-                    name: orders.project?.customer_name || 'N/A',
-                    address: orders.project?.work_place || '',
-                    mobile: orders.project?.mobile_number || '',
-                    gst_number: orders.project?.gst_number || '',
-                },
+                // Flattened customer details for InvoiceMulPdf.js
+                name: orders.project?.customer_name || 'N/A',
+                address: orders.project?.work_place || '',
+                mobile: orders.project?.mobile_number || '',
+                gst_number: orders.project?.gst_number || '',
+
                 consignee: {
                     name: ci.company_name,
                     address: `${ci.land_mark || ''}, ${ci.Tal || ''}, ${ci.Dist || ''}, ${ci.pincode || ''}`,

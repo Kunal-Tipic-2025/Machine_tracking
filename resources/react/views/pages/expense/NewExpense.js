@@ -52,7 +52,7 @@ const NewExpense = () => {
   const [isOperatorExpense, setIsOperatorExpense] = useState(false);
 
 
- const companyId = getUserData()?.company_id;
+  const companyId = getUserData()?.company_id;
 
 
   const fetchMachineries = async () => {
@@ -464,7 +464,7 @@ const NewExpense = () => {
   //     }
   //   };
 
-  
+
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -768,10 +768,18 @@ const NewExpense = () => {
                         // }}
                         onChange={(selectedOption) => {
                           console.log('selectedOption', selectedOption);
-                          const category = String(selectedOption?.label || '').toLowerCase();
+                          const label = String(selectedOption?.label || '').toLowerCase();
 
-                          const isOperator = category === 'operator' || 'helper';
-                          const isMachineRelated = category.includes('machine');
+                          // ✅ Fix: Check for exact match or includes, and fix the boolean logic error
+                          // Previous code: category === 'operator' || 'helper' (always true)
+                          const isOperator = label.includes('operator') || label.includes('helper') || label.includes('driver');
+
+                          // ✅ Add diesel/desile to machine related
+                          const isMachineRelated = label.includes('machine') ||
+                            label.includes('diesel') ||
+                            label.includes('desile') ||
+                            label.includes('maintenance') ||
+                            label.includes('repair');
 
                           setIsOperatorExpense(isOperator);
 
@@ -841,71 +849,81 @@ const NewExpense = () => {
                     </div>
                   )}
 
-                  <div className="col-sm-4">
-                    {isOperatorExpense ? (
-                      <>
-                        <CFormLabel><b>{t("LABELS.operator_helper_name")}</b></CFormLabel>
+                  {/* Only show Operator or Customer column if:
+                      1. It IS an operator expense (Show Operator dropdown)
+                      OR 
+                      2. It is NOT a machine/diesel expense (Show Customer dropdown)
+                      
+                      If it IS a machine/diesel expense (state.open=true) and NOT operator, 
+                      we hide this column entirely as per user request (only select machine).
+                  */}
+                  {(isOperatorExpense || !state.open) && (
+                    <div className="col-sm-4">
+                      {isOperatorExpense ? (
+                        <>
+                          <CFormLabel><b>{t("LABELS.operator_helper_name")}</b></CFormLabel>
 
-                        <Select
-                          value={
-                            operators
-                              .map(o => ({ value: o.id, label: o.name }))
-                              .find(opt => String(opt.value) === String(state.operator_id)) || null
-                          }
-                          onChange={(opt) =>
-                            setState(prev => ({
-                              ...prev,
-                              operator_id: opt ? opt.value : ''
-                            }))
-                          }
-                          options={operators.map(o => ({
-                            value: o.id,
-                            label: o.name
-                          }))}
-                          isDisabled={getUserData()?.type === 2 || getUserData()?.type === 4} // 🔒 operator cannot change
-                          placeholder="Select Operator"
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <div className="">
-                          <CFormLabel htmlFor="customer_id"><b>{t("LABELS.customer_name")}</b></CFormLabel>
                           <Select
-                            id="customer_id"
-                            name="customer_id"
                             value={
-                              projects
-                                .map(p => ({ value: p.id, label: p.customer_name }))
-                                .find(opt => String(opt.value) === String(state.customer_id)) || null
+                              operators
+                                .map(o => ({ value: o.id, label: o.name }))
+                                .find(opt => String(opt.value) === String(state.operator_id)) || null
                             }
-                            onChange={(selectedOption) =>
+                            onChange={(opt) =>
                               setState(prev => ({
                                 ...prev,
-                                customer_id: selectedOption ? selectedOption.value : "",
-                                project_id: selectedOption ? selectedOption.value : ""
+                                operator_id: opt ? opt.value : ''
                               }))
                             }
-                            options={projects.map(p => ({
-                              value: p.id,
-                              label: p.customer_name
+                            options={operators.map(o => ({
+                              value: o.id,
+                              label: o.name
                             }))}
-                            placeholder={t("LABELS.customer_name")}
-                            isClearable
-                            isSearchable
-                            styles={{
-                              control: (base) => ({
-                                ...base,
-                                borderRadius: "0.5rem",
-                                borderColor: "#ced4da",
-                                minHeight: "38px",
-                              }),
-                            }}
+                            isDisabled={getUserData()?.type === 2 || getUserData()?.type === 4} // 🔒 operator cannot change
+                            placeholder="Select Operator"
                           />
-                        </div>
-                      </>
-                    )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="">
+                            <CFormLabel htmlFor="customer_id"><b>{t("LABELS.customer_name")}</b></CFormLabel>
+                            <Select
+                              id="customer_id"
+                              name="customer_id"
+                              value={
+                                projects
+                                  .map(p => ({ value: p.id, label: p.customer_name }))
+                                  .find(opt => String(opt.value) === String(state.customer_id)) || null
+                              }
+                              onChange={(selectedOption) =>
+                                setState(prev => ({
+                                  ...prev,
+                                  customer_id: selectedOption ? selectedOption.value : "",
+                                  project_id: selectedOption ? selectedOption.value : ""
+                                }))
+                              }
+                              options={projects.map(p => ({
+                                value: p.id,
+                                label: p.customer_name
+                              }))}
+                              placeholder={t("LABELS.customer_name")}
+                              isClearable
+                              isSearchable
+                              styles={{
+                                control: (base) => ({
+                                  ...base,
+                                  borderRadius: "0.5rem",
+                                  borderColor: "#ced4da",
+                                  minHeight: "38px",
+                                }),
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
 
-                  </div>
+                    </div>
+                  )}
 
 
                   <div className="col-sm-4">
@@ -918,7 +936,7 @@ const NewExpense = () => {
                         name="desc"
                         value={state.desc}
                         onChange={handleChange}
-                        // required
+                      // required
                       />
                     </div>
                   </div>
@@ -1036,7 +1054,7 @@ const NewExpense = () => {
                     <CFormInput
                       type="number"
                       value={state.total_price}
-                        onFocus={() => setState(prev => ({ ...prev, total_price: '' }))}
+                      onFocus={() => setState(prev => ({ ...prev, total_price: '' }))}
                       onChange={(e) =>
                         setState(prev => ({ ...prev, total_price: e.target.value }))
                       }

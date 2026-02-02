@@ -635,7 +635,7 @@
 //         'aadhar' => $request->aadhar,
 //         'pan' => $request->pan,
 //         'transaction_id' => $request->transaction_id,
-
+//         'machine_id' => $request->machine_id,
 
 //         'show' => $request->show,
 //         'company_id' => $user->company_id,
