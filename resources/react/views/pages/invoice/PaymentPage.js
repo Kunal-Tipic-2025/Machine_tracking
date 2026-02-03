@@ -210,12 +210,16 @@ const PaymentPage = () => {
 
 
     const additionalTotal = additionalCharges.reduce(
-        (sum, c) => sum + Number(c.amount || 0),
+        (sum, c) => {
+            const amt = Number(c.amount || 0);
+            // Fallback to charge definition if flag is missing in invoice entry
+            const isDeduct = c.amount_deduct || c.charge_definition?.amount_deduct;
+            return isDeduct ? sum - amt : sum + amt;
+        },
         0
     );
 
-    const grandTotal = (Number(response?.total) || 0);
-    // const grandTotal = (Number(response?.total) || 0) + additionalTotal;
+    const grandTotal = (Number(response?.total) || 0) + additionalTotal;
 
     const startEditCharge = (charge) => {
         setEditingChargeId(charge.id);
@@ -503,9 +507,11 @@ const PaymentPage = () => {
                 //         payable_amount: leftoverForExtras, // ✅ ONLY leftover
                 //     }),
                 // });
-                const data = { invoice_id: response.invoice_number,
-                        payable_amount: leftoverForExtras}
-                await post('/api/invoice-additional-charges/auto-settle',data);
+                const data = {
+                    invoice_id: response.invoice_number,
+                    payable_amount: leftoverForExtras
+                }
+                await post('/api/invoice-additional-charges/auto-settle', data);
                 showToast('success', 'Additional charges adjusted');
             }
 
@@ -1047,50 +1053,30 @@ const PaymentPage = () => {
                                 </CTableHead>
 
                                 <CTableBody>
-                                    {additionalCharges.map((c) => (
-                                        <CTableRow key={c.id}>
-                                            <CTableDataCell>
-                                                {c.charge_type.replace('_', ' ').toUpperCase()}
-                                            </CTableDataCell>
+                                    {additionalCharges.map((c) => {
+                                        const isDeduct = c.amount_deduct || c.charge_definition?.amount_deduct;
+                                        return (
+                                            <CTableRow key={c.id}>
+                                                <CTableDataCell>
+                                                    {c.charge_type.replace('_', ' ').toUpperCase()} {isDeduct ? '(-)' : '(+)'}
+                                                </CTableDataCell>
 
-                                            <CTableDataCell>
-                                                {editingChargeId === c.id ? (
-                                                    <input
-                                                        type="number"
-                                                        className="form-control form-control-sm"
-                                                        value={editingChargeAmount}
-                                                        min="0"
-                                                        onChange={(e) => setEditingChargeAmount(e.target.value)}
-                                                    />
-                                                ) : (
-                                                    <>₹{Number(c.amount).toFixed(2)}</>
-                                                )}
-                                            </CTableDataCell>
-
-                                            {/* <CTableDataCell>
-                                                {editingChargeId === c.id ? (
-                                                    <>
-                                                        <CButton size="sm" color="success" onClick={() => saveEditCharge(c)}>
-                                                            Save
-                                                        </CButton>
-                                                        <CButton
-                                                            size="sm"
-                                                            color="secondary"
-                                                            variant="outline"
-                                                            className="ms-1"
-                                                            onClick={cancelEditCharge}
-                                                        >
-                                                            Cancel
-                                                        </CButton>
-                                                    </>
-                                                ) : (
-                                                    <CButton size="sm" color="info" onClick={() => startEditCharge(c)}>
-                                                        Edit
-                                                    </CButton>
-                                                )}
-                                            </CTableDataCell> */}
-                                        </CTableRow>
-                                    ))}
+                                                <CTableDataCell style={{ color: isDeduct ? 'red' : 'inherit' }}>
+                                                    {editingChargeId === c.id ? (
+                                                        <input
+                                                            type="number"
+                                                            className="form-control form-control-sm"
+                                                            value={editingChargeAmount}
+                                                            min="0"
+                                                            onChange={(e) => setEditingChargeAmount(e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <>{isDeduct ? '-' : ''}₹{Number(c.amount).toFixed(2)}</>
+                                                    )}
+                                                </CTableDataCell>
+                                            </CTableRow>
+                                        );
+                                    })}
 
                                     {/* Charges Total */}
                                     <CTableRow className="table-secondary fw-bold">
@@ -1098,9 +1084,7 @@ const PaymentPage = () => {
                                             Total
                                         </CTableDataCell>
                                         <CTableDataCell colSpan={2}>
-                                            ₹{additionalCharges
-                                                .reduce((sum, c) => sum + Number(c.amount || 0), 0)
-                                                .toFixed(2)}
+                                            ₹{additionalTotal.toFixed(2)}
                                         </CTableDataCell>
                                     </CTableRow>
                                 </CTableBody>
@@ -1123,7 +1107,7 @@ const PaymentPage = () => {
                                             </CTableDataCell>
                                             <CTableDataCell className="py-1 text-start">
                                                 {/* ₹{response.total  } */}
-                                                ₹{response.total }
+                                                ₹{grandTotal.toFixed(2)}
                                             </CTableDataCell>
                                         </CTableRow>
                                     </>

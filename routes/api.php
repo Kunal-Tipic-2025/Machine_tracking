@@ -285,6 +285,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 
     //Additional chnages for invoice creation
+    Route::get('/charge-types', [App\Http\Controllers\ChargeTypeController::class, 'index']); // New Route
+    Route::post('/charge-types', [App\Http\Controllers\ChargeTypeController::class, 'store']);
+    Route::put('/charge-types/{id}', [App\Http\Controllers\ChargeTypeController::class, 'update']);
+    Route::delete('/charge-types/{id}', [App\Http\Controllers\ChargeTypeController::class, 'destroy']);
     Route::post('/invoice-additional-charges/bulk', [InvoiceAdditionalChargeController::class, 'storeBulk']);
     Route::get('/invoice-additional-charges/{invoiceId}', [InvoiceAdditionalChargeController::class, 'getByInvoice']);
     Route::put('/invoice-additional-charges/{id}', [InvoiceAdditionalChargeController::class, 'update']);

@@ -10,6 +10,7 @@ class OperatorExpense extends Model
     protected $fillable = [
         'operator_id',
         'company_id',
+        'machine_id',
         'about_expenses',
         'total_amount',
         'is_settle',
@@ -33,5 +34,10 @@ class OperatorExpense extends Model
 {
     return $this->belongsTo(SalaryPayment::class, 'settled_in_salary_id');
 }
+
+    public function machine()
+    {
+        return $this->belongsTo(MachineOperator::class, 'machine_id');
+    }
 
 }

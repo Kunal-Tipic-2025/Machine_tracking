@@ -309,9 +309,12 @@ const OrderList = ({ projectId, inModal = false }) => {
     // const isCompleted = remaining <= 0;
 
     // Calculate additional charges totals for display
-    const additionalChargesTotal = additionalCharges.reduce((sum, charge) =>
-        sum + Number(charge.amount || 0), 0
-    );
+    const additionalChargesTotal = additionalCharges.reduce((sum, charge) => {
+        const amt = Number(charge.amount || 0);
+        // Fallback to charge definition if flag is missing in invoice entry
+        const isDeduct = charge.amount_deduct || charge.charge_definition?.amount_deduct;
+        return isDeduct ? sum - amt : sum + amt;
+    }, 0);
 
     // Trust backend provided totals
     // If backend provides 'grand_total', use it. Otherwise fallback (carefully).
@@ -532,28 +535,33 @@ const OrderList = ({ projectId, inModal = false }) => {
                                                 Additional Charges
                                             </CTableDataCell>
                                         </CTableRow>
-                                        {additionalCharges.map((charge, idx) => (
-                                            <CTableRow key={`charge-${charge.id}`} style={{ backgroundColor: '#f8f9fa' }}>
-                                                <CTableDataCell>{filteredLogs.length + idx + 1}</CTableDataCell>
-                                                <CTableDataCell>{charge.date ? new Date(charge.date).toLocaleDateString('en-GB') : '-'}</CTableDataCell>
-                                                <CTableDataCell colSpan={7}>
-                                                    <strong>{formatChargeType(charge.charge_type)}</strong>
-                                                    {charge.remark && (
-                                                        <div className="small text-muted mt-1">
-                                                            Note: {charge.remark}
-                                                        </div>
-                                                    )}
-                                                </CTableDataCell>
-                                                <CTableDataCell className="text-center">
-                                                    <CBadge color={charge.is_paid ? "success" : "warning"}>
-                                                        {charge.is_paid ? "Paid" : "Pending"}
-                                                    </CBadge>
-                                                </CTableDataCell>
-                                                <CTableDataCell className="text-end fw-bold">
-                                                    ₹{Number(charge.amount).toFixed(2)}
-                                                </CTableDataCell>
-                                            </CTableRow>
-                                        ))}
+                                        {additionalCharges.map((charge, idx) => {
+                                            const isDeduct = charge.amount_deduct || charge.charge_definition?.amount_deduct;
+                                            return (
+                                                <CTableRow key={`charge-${charge.id}`} style={{ backgroundColor: '#f8f9fa' }}>
+                                                    <CTableDataCell>{filteredLogs.length + idx + 1}</CTableDataCell>
+                                                    <CTableDataCell>{charge.date ? new Date(charge.date).toLocaleDateString('en-GB') : '-'}</CTableDataCell>
+                                                    <CTableDataCell colSpan={7}>
+                                                        <strong>
+                                                            {formatChargeType(charge.charge_type)} {isDeduct ? '(-)' : '(+)'}
+                                                        </strong>
+                                                        {charge.remark && (
+                                                            <div className="small text-muted mt-1">
+                                                                Note: {charge.remark}
+                                                            </div>
+                                                        )}
+                                                    </CTableDataCell>
+                                                    <CTableDataCell className="text-center">
+                                                        <CBadge color={charge.is_paid ? "success" : "warning"}>
+                                                            {charge.is_paid ? "Paid" : "Pending"}
+                                                        </CBadge>
+                                                    </CTableDataCell>
+                                                    <CTableDataCell className="text-end fw-bold" style={{ color: isDeduct ? 'red' : 'inherit' }}>
+                                                        {isDeduct ? '-' : ''}₹{Number(charge.amount).toFixed(2)}
+                                                    </CTableDataCell>
+                                                </CTableRow>
+                                            );
+                                        })}
                                     </>
                                 )}
 

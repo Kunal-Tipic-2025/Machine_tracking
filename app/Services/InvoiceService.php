@@ -25,8 +25,21 @@ class InvoiceService
             $invoice->load('additionalCharges');
         }
 
-        $additionalChargesTotal = $invoice->additionalCharges->sum('amount');
-        $additionalChargesPaid = $invoice->additionalCharges->sum('paid_amount');
+        // Separate Additions and Deductions
+        $chargesToAdd = $invoice->additionalCharges->filter(fn($c) => !$c->amount_deduct);
+        $chargesToDeduct = $invoice->additionalCharges->filter(fn($c) => $c->amount_deduct);
+
+        $totalAdditions = $chargesToAdd->sum('amount');
+        $totalDeductions = $chargesToDeduct->sum('amount');
+        
+        $paidAdditions = $chargesToAdd->sum('paid_amount');
+        // Deductions don't really have "paid_amount" in the same sense, but if tracking payment for them:
+        // Usually deductions just REDUCE the payable amount. 
+        // If a deduction has "paid_amount", it might mean we "refunded" it? 
+        // For now, let's assume we focused on Net Payable.
+        
+        $additionalChargesTotal = $totalAdditions - $totalDeductions;
+        $additionalChargesPaid = $paidAdditions; // Only counting payments towards positive charges
 
         // 3. Calculate Work Order Paid Amount
         // CRITICAL FIX: The 'paid_amount' column on ProjectPayment might contain
@@ -43,6 +56,7 @@ class InvoiceService
         $workOrderPaid = min($rawPaidAmount, $workOrderAmount);
 
         // 4. Calculate Grand Totals
+        // Grand Total = Work Order + (Additions - Deductions)
         $grandTotal = $workOrderAmount + $additionalChargesTotal;
         $totalPaid = $workOrderPaid + $additionalChargesPaid;
         

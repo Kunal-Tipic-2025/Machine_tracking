@@ -124,6 +124,7 @@ const addQty = React.lazy(() => import('./views/pages/RawMaterials/addQty'))
 const ModesTable = React.lazy(() => import('./views/pages/modes/ModesTable'))
 const AddMode = React.lazy(() => import('./views/pages/modes/AddMode'))
 const CompanySummary = React.lazy(() => import('./views/pages/dashboard/CompanySummary'))
+const ChargeTypesList = React.lazy(() => import('./views/pages/charge_types/ChargeTypesList'))
 
 export default function fetchRoutes() {
   const user = getUserType();
@@ -139,6 +140,7 @@ export default function fetchRoutes() {
       { path: '/invoice', name: 'Invoice', element: Invoice },
       { path: '/edit-order/:id', name: 'Update Invoice', element: EditInvoice },
       { path: '/booking', name: 'Booking', element: Booking },
+      { path: '/charge-types', name: 'Charge Types', element: ChargeTypesList },
       { path: '/newCustomer', name: 'New Customer', element: Delivery },
       { path: '/company/new', name: 'New Company', element: NewCompany },
       { path: '/company/all', name: 'All Companies', element: AllCompanies },
@@ -200,6 +202,7 @@ export default function fetchRoutes() {
       { path: '/project', name: 'Project', element: Project },
       { path: '/edit-order/:id', name: 'Update Invoice', element: EditInvoice },
       { path: '/booking', name: 'Booking', element: Booking },
+      { path: '/charge-types', name: 'Charge Types', element: ChargeTypesList },
       { path: '/invoice-details/:id', name: 'InvoiceDetails', element: InvoiceDetails },
       { path: '/bookings', name: 'Adv Bookings', element: Orders },
       { path: '/quotation', name: 'Quotation', element: Orders },
@@ -275,6 +278,7 @@ export default function fetchRoutes() {
       // { path: '/invoice', name: 'invoice', element: Invoice },
       { path: '/edit-order/:id', name: 'Update Invoice', element: EditInvoice },
       { path: '/booking', name: 'Booking', element: Booking },
+      { path: '/charge-types', name: 'Charge Types', element: ChargeTypesList },
       { path: '/invoice-details/:id', name: 'InvoiceDetails', element: InvoiceDetails },
       { path: '/bookings', name: 'Adv Bookings', element: Orders },
       { path: '/quotation', name: 'Quotation', element: Orders },
@@ -336,7 +340,7 @@ export default function fetchRoutes() {
       { path: '/partner/dashboard', name: 'Onboarding partner dashboard', element: PartnerDashboard },
     ]
   }
-   else if (user === 4) {
+  else if (user === 4) {
     routes = [
       { path: '/expense/new', name: 'New Type', element: NewExpense },
       { path: '/expense/new-type', name: 'New Type', element: NewExpenseType },

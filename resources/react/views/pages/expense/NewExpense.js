@@ -503,6 +503,11 @@ const NewExpense = () => {
     // Add file only if selected (UI for photo is currently commented out)
     if (state.photo_url instanceof File) formData.append("photo_url", state.photo_url);
 
+    if (state.open && !isOperatorExpense && !state.machine_id) {
+      showToast('danger', 'Machine is required');
+      return;
+    }
+
     if (isOperatorExpense && !state.operator_id) {
       showToast('danger', 'Operator is required');
       return;
@@ -768,25 +773,28 @@ const NewExpense = () => {
                         // }}
                         onChange={(selectedOption) => {
                           console.log('selectedOption', selectedOption);
+
+                          const category = String(selectedOption?.expense_category || '').toLowerCase();
                           const label = String(selectedOption?.label || '').toLowerCase();
 
-                          // ✅ Fix: Check for exact match or includes, and fix the boolean logic error
-                          // Previous code: category === 'operator' || 'helper' (always true)
-                          const isOperator = label.includes('operator') || label.includes('helper') || label.includes('driver');
+                          // Check for Operator/Helper category
+                          const isOperator = category.includes('operator') || category.includes('helper') || category.includes('driver');
 
-                          // ✅ Add diesel/desile to machine related
-                          const isMachineRelated = label.includes('machine') ||
-                            label.includes('diesel') ||
-                            label.includes('desile') ||
-                            label.includes('maintenance') ||
-                            label.includes('repair');
+                          // Check if Machine Dropdown should be shown
+                          // User request: Show machine for Machine, Operator/Helper, Capital, and Operational expenses.
+                          const isMachineRelated =
+                            category.includes('machine') ||
+                            category.includes('operator') ||
+                            category.includes('helper') ||
+                            category.includes('capital') ||
+                            category.includes('operational');
 
                           setIsOperatorExpense(isOperator);
 
                           setState(prev => ({
                             ...prev,
                             expense_id: selectedOption ? selectedOption.value : "",
-                            open: isMachineRelated,
+                            open: isMachineRelated, // Controls Machine Dropdown visibility
                             customer_id: '',     // reset customer
                             project_id: '',
                             operator_id: ''      // reset operator
@@ -857,7 +865,7 @@ const NewExpense = () => {
                       If it IS a machine/diesel expense (state.open=true) and NOT operator, 
                       we hide this column entirely as per user request (only select machine).
                   */}
-                  {(isOperatorExpense || !state.open) && (
+                  {(state.expense_id) && (
                     <div className="col-sm-4">
                       {isOperatorExpense ? (
                         <>

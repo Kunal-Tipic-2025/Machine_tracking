@@ -16,7 +16,9 @@ class InvoiceAdditionalChargeController extends Controller
             'company_id' => 'required|integer',
             'charges' => 'required|array',
             'charges.*.charge_type' => 'required|string',
+            'charges.*.charge_type_id' => 'nullable|integer',
             'charges.*.amount' => 'required|numeric|min:0',
+            'charges.*.amount_deduct' => 'nullable|boolean',
             'charges.*.remark' => 'nullable|string',
             'charges.*.is_paid' => 'nullable|boolean',
             'charges.*.date' => 'nullable|date',
@@ -26,8 +28,10 @@ class InvoiceAdditionalChargeController extends Controller
             InvoiceAdditionalCharge::create([
                 'invoice_id' => $request->invoice_id,
                 'company_id' => $request->company_id,
-                'charge_type' => $charge['charge_type'],
+                'charge_type' => $charge['charge_type'], // Name/Label
+                'charge_type_id' => $charge['charge_type_id'] ?? null, // Link to DB
                 'amount' => $charge['amount'],
+                'amount_deduct' => $charge['amount_deduct'] ?? false,
                 'remark' => $charge['remark'] ?? null,
                 'is_paid' => false,
                 'date' => $charge['date'] ?? now()->toDateString(),
@@ -43,6 +47,7 @@ class InvoiceAdditionalChargeController extends Controller
     public function getByInvoice($invoiceId)
     {
         return InvoiceAdditionalCharge::where('invoice_id', $invoiceId)
+            ->with('chargeDefinition')
             ->orderBy('id', 'asc')
             ->get();
     }

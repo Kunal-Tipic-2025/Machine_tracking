@@ -260,7 +260,7 @@ const OperatorSalary = () => {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const { t } = useTranslation("global");
-  
+
   const { showToast } = useToast();
 
   const [selectedMonth, setSelectedMonth] = useState(
@@ -378,6 +378,7 @@ const OperatorSalary = () => {
     const expenses = rawExpenses.map(e => ({
       id: e.id,
       label: e.about_expenses,
+      machine_name: e.machine?.machine_name,
       amount: Number(e.total_amount || 0),
       deduct: false,
     }));
@@ -385,7 +386,7 @@ const OperatorSalary = () => {
     const salaryHistory = (history.salary_history || []).map(s => ({
       month: s.month,
       paid: Number(s.net_salary || 0),
-      expenses: Number(s.total_expense_deducted|| 0 ), // we don’t show detailed expense list here
+      expenses: Number(s.total_expense_deducted || 0), // we don’t show detailed expense list here
       advanceApplied: Number(s.total_advance_deducted || 0),
     }));
 
@@ -628,11 +629,11 @@ const OperatorSalary = () => {
       });
 
 
-        // 🔥 ADD THIS: Refresh operator table data
-    await refreshOperatorSummary();
+      // 🔥 ADD THIS: Refresh operator table data
+      await refreshOperatorSummary();
 
-    // 🔥 ADD THIS: Refresh dashboard totals
-    await refreshDashboardSummary();
+      // 🔥 ADD THIS: Refresh dashboard totals
+      await refreshDashboardSummary();
 
       // // 3️⃣ Update operator advances
       // setOperators(prev =>
@@ -967,7 +968,7 @@ const OperatorSalary = () => {
                 {operators.length}
               </div>
               <div className="text-muted" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
-                
+
                 {t("LABELS.total_operator_helper")}
                 {/* {toggleExpense('LABELS.total_operator_helper')} */}
               </div>
@@ -982,7 +983,7 @@ const OperatorSalary = () => {
               </div>
               <div className="text-muted" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
                 {/* Total Payroll */}
-                 {t("LABELS.total_payroll")}
+                {t("LABELS.total_payroll")}
               </div>
             </CCardBody>
           </CCard>
@@ -995,7 +996,7 @@ const OperatorSalary = () => {
               </div>
               <div className="text-muted" style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)' }}>
                 {/* Total Advances */}
-                 {t("LABELS.total_advane")}
+                {t("LABELS.total_advane")}
               </div>
             </CCardBody>
           </CCard>
@@ -1032,7 +1033,7 @@ const OperatorSalary = () => {
   <button onClick={() => setSearchQuery('')}>✕</button>
 )} */}
 
-      <div className="position-relative" style={{ maxWidth: '400px', paddingBottom: '6px', marginBottom:'2px'}}>
+      <div className="position-relative" style={{ maxWidth: '400px', paddingBottom: '6px', marginBottom: '2px' }}>
         <input
           type="text"
           className="form-control pe-5"
@@ -1245,7 +1246,8 @@ const OperatorSalary = () => {
                   <CTable className="mb-0">
                     <CTableHead style={{ background: '#fafafa' }}>
                       <CTableRow>
-                        <CTableHeaderCell>Expense Type</CTableHeaderCell>
+                        <CTableHeaderCell>Description</CTableHeaderCell>
+                        <CTableHeaderCell>Machine Name</CTableHeaderCell>
                         <CTableHeaderCell>Amount</CTableHeaderCell>
                         <CTableHeaderCell className="text-center">Deduct This Month</CTableHeaderCell>
                       </CTableRow>
@@ -1255,6 +1257,13 @@ const OperatorSalary = () => {
                         <CTableRow key={e.id} style={{ background: e.deduct ? '#fef3c7' : 'white' }}>
                           <CTableDataCell>
                             <span className="fw-semibold">{e.label}</span>
+                          </CTableDataCell>
+                          <CTableDataCell>
+                            {e.machine_name ? (
+                              <span className="text-primary fw-medium">{e.machine_name}</span>
+                            ) : (
+                              <span className="text-muted small">NA</span>
+                            )}
                           </CTableDataCell>
                           <CTableDataCell>
                             <span className="fw-bold text-danger">₹{e.amount}</span>
@@ -1412,9 +1421,9 @@ const OperatorSalary = () => {
                               {s.expenses > 0 ? (
                                 <div className="d-flex flex-wrap gap-1">
                                   {/* {s.expenses.map(e => ( */}
-                                    <CBadge  color="warning" className="text-dark">
-                                       ₹{s.expenses}
-                                    </CBadge>
+                                  <CBadge color="warning" className="text-dark">
+                                    ₹{s.expenses}
+                                  </CBadge>
                                   {/* ))} */}
                                 </div>
                               ) : (

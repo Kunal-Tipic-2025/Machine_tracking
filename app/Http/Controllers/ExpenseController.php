@@ -1443,7 +1443,17 @@ class ExpenseController extends Controller
         // DB::beginTransaction();
 
         try {
-            if ($expenseType->name === 'Operator') {
+            $category = strtolower($expenseType->expense_category ?? '');
+            $name = strtolower($expenseType->name ?? '');
+            
+            if (
+                str_contains($category, 'operator') || 
+                str_contains($category, 'helper') || 
+                str_contains($category, 'driver') ||
+                str_contains($name, 'operator') || 
+                str_contains($name, 'helper') || 
+                str_contains($name, 'driver')
+            ) {
 
                 $request->validate([
                     'operator_id' => [
@@ -1463,7 +1473,8 @@ class ExpenseController extends Controller
                     'total_amount'  => $request->total_price,
                     'expense_date'  => $request->expense_date,
                     'created_at' => Carbon::now()->toDateString(),
-                    'is_settle' => false
+                    'is_settle' => false,
+                    'machine_id' => $request->machine_id,
                 ]);
             } else {
 
@@ -1828,12 +1839,14 @@ class ExpenseController extends Controller
             'operator_id' => 'required|integer|exists:users,id',
         ]);
 
-        $expenses = OperatorExpense::where('operator_id', $request->operator_id)
+        $expenses = OperatorExpense::with('machine')
+            ->where('operator_id', $request->operator_id)
             ->where('is_settle', false)
             ->orderBy('expense_date', 'asc')
             ->get([
                 'id',
                 'operator_id',
+                'machine_id',
                 'total_amount',
                 'expense_date',
                 'about_expenses'

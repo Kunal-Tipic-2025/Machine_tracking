@@ -212,7 +212,7 @@ export default function fetchNavItems(t1) {
             to: '/Reports/creditReport',
             className: 'ms-2',
           },
-           {
+          {
             component: CNavItem,
             // name: t("LABELS.project_report"),
             name: t("Operator Salary"),
@@ -243,6 +243,12 @@ export default function fetchNavItems(t1) {
             component: CNavItem,
             name: t("LABELS.all_expense_types"),
             to: '/expense/all-type',
+            className: 'ms-2',
+          },
+          {
+            component: CNavItem,
+            name: "All Charge Types",
+            to: '/charge-types',
             className: 'ms-2',
           },
           {
@@ -408,10 +414,10 @@ export default function fetchNavItems(t1) {
   }
 
 
- 
 
 
-    //Helper
+
+  //Helper
   else if (user === 4) {
     _nav = [
       // {
@@ -441,7 +447,7 @@ export default function fetchNavItems(t1) {
         to: '/expense/new',
         icon: <CIcon icon={cilDollar} customClassName="nav-icon" />,
       },
-     
+
     ];
   }
 

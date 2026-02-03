@@ -9,6 +9,7 @@ import {
   CCardHeader,
   CCol,
   CForm,
+  CFormCheck,
   CFormInput,
   CFormLabel,
   CFormSelect,
@@ -27,6 +28,7 @@ import { getAPICall, post, put } from '../../../util/api'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../common/toast/ToastContext'
 import { useTranslation } from 'react-i18next'
+import ChargeTypeModal from './ChargeTypeModal'
 
 const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
   const [validated, setValidated] = useState(false)
@@ -105,21 +107,74 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
 
   //Extra charges
+  const [availableChargeTypes, setAvailableChargeTypes] = useState([]) // New State for Charge Types
+
+  // Searchable Dropdown States`
+  const [chargeSearchQuery, setChargeSearchQuery] = useState({}); // { index: "query" }
+  const [showChargeDropdown, setShowChargeDropdown] = useState({}); // { index: boolean }
+  const [showNewChargeModal, setShowNewChargeModal] = useState(false);
+  const [currentChargeIndex, setCurrentChargeIndex] = useState(null);
+  const [newChargeForm, setNewChargeForm] = useState({ name: '', local_name: '', amount_deduct: false });
 
   const [additionalCharges, setAdditionalCharges] = useState([
     {
       charge_type: '',
+      charge_type_id: null, // Track ID
       amount: '',
+      amount_deduct: false, // Track deduct flag
       remark: '',
       is_paid: false,
       date: new Date().toISOString().split('T')[0],
     },
   ]);
 
+  // Fetch Charge Types
+  const fetchChargeTypes = async () => {
+    try {
+      const response = await getAPICall('/api/charge-types');
+      if (Array.isArray(response)) {
+        setAvailableChargeTypes(response);
+      }
+    } catch (error) {
+      console.error('Error fetching charge types:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchChargeTypes();
+  }, []); // Run once on mount
+
+  // handleNewChargeSubmit removed (moved to ChargeTypeModal)
 
   const handleAdditionalChargeChange = (index, field, value) => {
     const updated = [...additionalCharges];
-    updated[index][field] = value;
+
+    if (field === 'charge_type') {
+      const selectedType = availableChargeTypes.find(ct => String(ct.name) === String(value) || String(ct.id) === String(value));
+      // Store name as value, but also keep track of ID and logic
+      // Value passed from Select is the Name string as per current logic (value={item.charge_type})
+      // But we can switch to using ID as value if we want.
+      // Current DB stores 'charge_type' as string name.
+      // Let's stick to storing Name in 'charge_type' for compatibility, but also store 'charge_type_id' & 'amount_deduct'.
+
+      // Actually, let's use the ID in the value for the select to be precise, or find by name if value is name
+
+      // If the SELECT value is the name:
+      updated[index]['charge_type'] = value;
+
+      if (selectedType) {
+        updated[index]['charge_type_id'] = selectedType.id;
+        updated[index]['amount_deduct'] = Boolean(selectedType.amount_deduct); // Force Boolean
+        updated[index]['local_name'] = selectedType.local_name;
+      } else {
+        // Reset if not found (or custom?) - user requirement implies only DB types
+        updated[index]['charge_type_id'] = null;
+        updated[index]['amount_deduct'] = false; // Default to Add if unknown
+      }
+    } else {
+      updated[index][field] = value;
+    }
+
     setAdditionalCharges(updated);
   };
 
@@ -128,7 +183,9 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
       ...additionalCharges,
       {
         charge_type: '',
+        charge_type_id: null,
         amount: '',
+        amount_deduct: false,
         remark: '',
         is_paid: false,
         date: new Date().toISOString().split('T')[0],
@@ -759,11 +816,29 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
       return
     }
 
+    // Validate Additional Charges
+    for (const charge of additionalCharges) {
+      if (Number(charge.amount) > 0) {
+        if (!charge.charge_type) {
+          showToast('danger', 'Please select a charge type for the entered amount');
+          return;
+        }
+        // Check if it's a valid DB entry (has ID)
+        const isValid = availableChargeTypes.some(ct => ct.name === charge.charge_type || ct.id === charge.charge_type_id);
+        if (!isValid && !charge.charge_type_id) { // If manual text and no ID matched
+          showToast('danger', `Charge type "${charge.charge_type}" is invalid. Please add it using the dropdown options.`);
+          return;
+        }
+      }
+    }
+
     const validAdditionalCharges = additionalCharges
       .filter(c => c.charge_type && Number(c.amount) > 0)
       .map(c => ({
-        charge_type: c.charge_type,
+        charge_type: c.charge_type, // Label
+        charge_type_id: c.charge_type_id ?? availableChargeTypes.find(t => t.name === c.charge_type)?.id ?? null, // Ensure ID is captured if missed
         amount: Number(c.amount),
+        amount_deduct: c.amount_deduct ?? false, // Deduct flag
         remark: c.remark || null,
         is_paid: c.is_paid ?? false,
         date: c.date,
@@ -1306,7 +1381,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                               </td>
                               <td className="text-center">{totalNetReading.toFixed(2)}</td>
                               <td></td>
-                              <td className="text-end pe-3">₹{totalAmount.toFixed(2)}</td>
+                              <td className="text-center">₹{totalAmount.toFixed(2)}</td>
                               <td></td>
                             </tr>
                           )
@@ -1324,22 +1399,73 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
                 <CCardBody>
                   {additionalCharges.map((item, index) => (
-                    <CRow className="align-items-end mb-3" key={index}>
-                      {/* Charge Type */}
+                    <CRow className="align-items-end mb-3" key={index} style={{ zIndex: 1000 - index, position: 'relative' }}>
+                      {/* Charge Type Searchable Dropdown */}
                       <CCol md={3}>
                         <CFormLabel>Charge Type</CFormLabel>
-                        <CFormSelect
-                          value={item.charge_type}
-                          onChange={(e) =>
-                            handleAdditionalChargeChange(index, 'charge_type', e.target.value)
-                          }
-                        >
-                          <option value="">Select charge type</option>
-                          <option value="service_charge">Service Charge</option>
-                          <option value="travelling_charge">Travelling Charge</option>
-                          <option value="other_charge">Other Charge</option>
-                        </CFormSelect>
+                        <div style={{ position: 'relative' }}>
+                          <CFormInput
+                            type="text"
+                            placeholder="Select or Search..."
+                            value={item.charge_type} // Display selected name or current search
+                            onChange={(e) => {
+                              handleAdditionalChargeChange(index, 'charge_type', e.target.value);
+                              setChargeSearchQuery(prev => ({ ...prev, [index]: e.target.value }));
+                              setShowChargeDropdown(prev => ({ ...prev, [index]: true }));
+                            }}
+                            onFocus={() => setShowChargeDropdown(prev => ({ ...prev, [index]: true }))}
+                            onBlur={() => setTimeout(() => setShowChargeDropdown(prev => ({ ...prev, [index]: false })), 200)} // Delay to allow click
+                          />
 
+                          {showChargeDropdown[index] && (
+                            <div className="dropdown-menu show" style={{
+                              width: '100%',
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              zIndex: 1050
+                            }}>
+                              {availableChargeTypes
+                                .filter(type =>
+                                  !item.charge_type ||
+                                  type.name.toLowerCase().includes(item.charge_type.toLowerCase()) ||
+                                  (type.local_name && type.local_name.toLowerCase().includes(item.charge_type.toLowerCase()))
+                                )
+                                .map(type => (
+                                  <button
+                                    key={type.id}
+                                    className="dropdown-item"
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()} // Prevent blur
+                                    onClick={() => {
+                                      handleAdditionalChargeChange(index, 'charge_type', type.name); // Select by Name
+                                      setShowChargeDropdown(prev => ({ ...prev, [index]: false }));
+                                    }}
+                                  >
+                                    {type.name} {type.local_name ? `(${type.local_name})` : ''} {type.amount_deduct ? '(-)' : '(+)'}
+                                  </button>
+                                ))}
+
+                              {availableChargeTypes.every(type => type.name.toLowerCase() !== (item.charge_type || '').toLowerCase()) && (
+                                <button
+                                  className="dropdown-item text-primary fw-bold"
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()} // Prevent blur
+                                  onClick={() => {
+                                    setNewChargeForm(prev => ({ ...prev, name: item.charge_type }));
+                                    setCurrentChargeIndex(index);
+                                    setShowNewChargeModal(true);
+                                    setShowChargeDropdown(prev => ({ ...prev, [index]: false }));
+                                  }}
+                                >
+                                  + Add "{item.charge_type}"
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </CCol>
 
                       {/* Amount */}
@@ -1355,18 +1481,6 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                         />
                       </CCol>
 
-                      {/* Remark */}
-                      {/* <CCol md={4}>
-                        <CFormLabel>Remark</CFormLabel>
-                        <CFormInput
-                          type="text"
-                          placeholder="Optional remark"
-                          value={item.remark}
-                          onChange={(e) =>
-                            handleAdditionalChargeChange(index, 'remark', e.target.value)
-                          }
-                        />
-                      </CCol> */}
                       <CCol> <CButton size="sm" color="primary" variant="outline" onClick={addAdditionalCharge}>
                         + Add Additional Charge
                       </CButton></CCol>
@@ -1388,18 +1502,21 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
                 </CCardBody>
 
-                {/* Grand Total + Additional Charges - ADD THIS */}
+                {/* Grand Total + Additional Charges - MODIFIED for Deduct Logic */}
                 {additionalCharges.some(charge => charge.charge_type && charge.amount) && (
                   <CCardBody className="border-top bg-light">
                     <CRow className="align-items-center">
                       <CCol md={9} className="text-end">
-                        <h6 className="mb-0 fw-bold">Additional Charges:</h6>
+                        <h6 className="mb-0 fw-bold">Additional Charges Net:</h6>
                       </CCol>
                       <CCol md={3}>
                         <h5 className="mb-0 fw-bold text-primary">
                           ₹{additionalCharges
                             .filter(charge => charge.charge_type && charge.amount)
-                            .reduce((sum, charge) => sum + (parseFloat(charge.amount) || 0), 0)
+                            .reduce((sum, charge) => {
+                              const amt = parseFloat(charge.amount) || 0;
+                              return charge.amount_deduct ? sum - amt : sum + amt;
+                            }, 0)
                             .toFixed(2)}
                         </h5>
                       </CCol>
@@ -1429,10 +1546,13 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                             return acc + (total * price);
                           }, 0);
 
-                        // Calculate additional charges total
+                        // Calculate additional charges total (Net)
                         const additionalTotal = additionalCharges
                           .filter(charge => charge.charge_type && charge.amount)
-                          .reduce((sum, charge) => sum + (parseFloat(charge.amount) || 0), 0);
+                          .reduce((sum, charge) => {
+                            const amt = parseFloat(charge.amount) || 0;
+                            return charge.amount_deduct ? sum - amt : sum + amt;
+                          }, 0);
 
                         // Return combined total
                         return (logsTotal + additionalTotal).toFixed(2);
@@ -1716,6 +1836,25 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
           </CCardBody>
         </CCard>
       </CCol>
+
+      {/* New Charge Type Modal Reusable Component */}
+      {showNewChargeModal && (
+        <ChargeTypeModal
+          visible={true}
+          onClose={() => setShowNewChargeModal(false)}
+          onSuccess={(newCharge) => {
+            // Callback when a charge is successfully created/updated
+            fetchChargeTypes(); // Refresh list
+
+            // Select the new charge for the current index
+            if (currentChargeIndex !== null) {
+              handleAdditionalChargeChange(currentChargeIndex, 'charge_type', newCharge.name);
+            }
+          }}
+          initialData={newChargeForm.name ? { name: newChargeForm.name } : null}
+        />
+      )}
+
     </CRow >
   )
 }

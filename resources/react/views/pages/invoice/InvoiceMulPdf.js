@@ -360,7 +360,11 @@ const InvoiceTemplate = ({
 
   // ✅ ADD: Calculate additional charges total
   const additionalChargesTotal = (formData.additionalCharges || []).reduce(
-    (sum, c) => sum + (Number(c.amount) || 0),
+    (sum, c) => {
+      const amt = Number(c.amount) || 0;
+      const isDeduct = c.amount_deduct || c.charge_definition?.amount_deduct;
+      return isDeduct ? sum - amt : sum + amt;
+    },
     0
   );
 
@@ -438,69 +442,69 @@ const InvoiceTemplate = ({
 
       {/* ✅ Fixed Bid Description OR Machine Logs Table */}
       {formData.is_fixed_bid ? (
-         <>
-        {/* // <div style={{ marginBottom: '10px', border: '1px solid #3075d2', padding: '10px' }}>
+        <>
+          {/* // <div style={{ marginBottom: '10px', border: '1px solid #3075d2', padding: '10px' }}>
         //   <p style={{ fontWeight: 'bold', marginBottom: '5px' }}>Description:</p>
         //   <p style={{ whiteSpace: 'pre-wrap' }}>{formData.remark || 'Fixed Bid Work'}</p>
         // </div> */}
-        
-        {/* Description Section */ }
-       
-        <div style={{ marginBottom: '10px', border: '1px solid #3075d2', padding: '10px' }}>
-          <p style={{ fontWeight: 'bold', marginBottom: '5px' }}>Description:</p>
-          <p style={{ whiteSpace: 'pre-wrap' }}>{formData.remark || 'Fixed Bid Work'}</p>
-        </div>
 
-    {/* Payment Summary for Fixed Bid */}
-      <div style={{ display: 'flex', gap: '10px', marginTop: '10px', marginBottom: '10px' }}>
-        {/* Total in Words */}
-        <div style={{ flex: '1' }}>
-          <div style={{ marginBottom: '5px', border: '1px solid #3075d2' }}>
-            <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', backgroundColor: '#e7f2fc', padding: '4px' }}>
-              {labels.totalInWords}
-            </p>
-            <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', padding: '4px' }}>
-              {calculatedTotalInWords}
-            </p>
+          {/* Description Section */}
+
+          <div style={{ marginBottom: '10px', border: '1px solid #3075d2', padding: '10px' }}>
+            <p style={{ fontWeight: 'bold', marginBottom: '5px' }}>Description:</p>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{formData.remark || 'Fixed Bid Work'}</p>
           </div>
-        </div>
 
-        {/* Payment Details Table */}
-        <div style={{ flex: '1' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #3075d2' }}>
-            <tbody>
-              {/* Total Amount */}
-              <tr>
-                <td style={{ padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
-                  Total Amount
-                </td>
-                <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #3075d2' }}>
-                  ₹{formatNumber(totalAmount)}
-                </td>
-              </tr>
+          {/* Payment Summary for Fixed Bid */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', marginBottom: '10px' }}>
+            {/* Total in Words */}
+            <div style={{ flex: '1' }}>
+              <div style={{ marginBottom: '5px', border: '1px solid #3075d2' }}>
+                <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', backgroundColor: '#e7f2fc', padding: '4px' }}>
+                  {labels.totalInWords}
+                </p>
+                <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', padding: '4px' }}>
+                  {calculatedTotalInWords}
+                </p>
+              </div>
+            </div>
 
-              {/* Paid Amount */}
-              <tr>
-                <td style={{ padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
-                  Paid Amount (Total)
-                </td>
-                <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #3075d2' }}>
-                  ₹{formatNumber(formData?.amountPaid || 0)}
-                </td>
-              </tr>
+            {/* Payment Details Table */}
+            <div style={{ flex: '1' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #3075d2' }}>
+                <tbody>
+                  {/* Total Amount */}
+                  <tr>
+                    <td style={{ padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
+                      Total Amount
+                    </td>
+                    <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #3075d2' }}>
+                      ₹{formatNumber(totalAmount)}
+                    </td>
+                  </tr>
 
-              {/* Remaining Amount */}
-              <tr>
-                <td style={{ backgroundColor: '#e7f2fc', padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
-                  Remaining Amount
-                </td>
-                <td style={{ backgroundColor: '#e7f2fc', padding: '4px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #3075d2' }}>
-                  ₹{formatNumber(totalAmount - (formData?.amountPaid || 0))}
-                </td>
-              </tr>
+                  {/* Paid Amount */}
+                  <tr>
+                    <td style={{ padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
+                      Paid Amount (Total)
+                    </td>
+                    <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #3075d2' }}>
+                      ₹{formatNumber(formData?.amountPaid || 0)}
+                    </td>
+                  </tr>
 
-             {/* Payment mode */}
-              {/* <tr>
+                  {/* Remaining Amount */}
+                  <tr>
+                    <td style={{ backgroundColor: '#e7f2fc', padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
+                      Remaining Amount
+                    </td>
+                    <td style={{ backgroundColor: '#e7f2fc', padding: '4px', textAlign: 'right', fontWeight: 'bold', border: '1px solid #3075d2' }}>
+                      ₹{formatNumber(totalAmount - (formData?.amountPaid || 0))}
+                    </td>
+                  </tr>
+
+                  {/* Payment mode */}
+                  {/* <tr>
                 <td style={{ padding: '4px', fontWeight: 'bold', border: '1px solid #3075d2' }}>
                   Payment mode
                 </td>
@@ -508,122 +512,122 @@ const InvoiceTemplate = ({
                   {formData?.paymentMode}
                 </td>
               </tr> */}
-              
-              {/* E & O.E. */}
-              <tr>
-                <td colSpan="2" style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '8px', padding: '2px', border: '1px solid #3075d2' }}>
-                  {labels.eAndOE}
-                </td>
-              </tr>
-            </tbody>
-          </table>
 
-          {/* Certification Text */}
-          <p style={{ margin: '5px 0', fontSize: '9px', fontStyle: 'italic' }}>
-            {labels.certified}
-          </p>
-
-          {/* Signature Section */}
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: '0 0 5px 0', fontSize: '10px', fontWeight: 'bold' }}>
-              {labels.for} {companyInfo.company_name || 'Kamthe Enterprises'}
-            </p>
-            {companyInfo.sign && (
-              <div style={{ height: '40px', borderBottom: '1px solid #3075d2', margin: '0 0 5px 0' }}>
-                <img src={`img/${companyInfo.sign}`} alt="Signature" style={{ maxWidth: '80px', maxHeight: '40px' }} />
-              </div>
-            )}
-            <p style={{ margin: '0', fontSize: '10px', fontWeight: 'bold' }}>
-              {labels.authorizedSignatory}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer Text */}
-      <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', marginTop: '5px' }}>
-        <p style={{ margin: '0' }}>This invoice is computer generated and authorized.</p>
-      </div>
-    </>
-  ) : (
-    logs.length > 0 && (
-      <div className="section" style={{ marginTop: '2rem', marginBottom: '10px' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            className="table table-bordered"
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              border: '1px solid #3075d2', // Updated border color
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: '#e7f2fc' }}> {/* Updated header background */}
-                <th style={{ width: '40px', border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Sr No</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Work Date</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Machine</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Mode</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Operator</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Work Type</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Start Reading</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>End Reading</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Net Reading</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Price per reading</th>
-                <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Total Price</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {logs.map((log, idx) => {
-                const netReading =
-                  (Number(log.data?.end_reading) || 0) - (Number(log.data?.start_reading) || 0);
-                const totalPrice = netReading * (Number(log.data?.price_per_hour) || 0);
-
-                return (
-                  <tr key={log.id}>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {idx + 1}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {(log.data?.work_date || '').toString().slice(0, 10).split('-').reverse().join('-') || 'N/A'}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {getMachineName(log.data?.machine_id) || 'N/A'}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {prices.find((op) => op.id === log.data?.mode_id)?.mode || 'N/A'}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {operators.find(
-                        (op) => String(op.id) === String(log.data?.operator_id)
-                      )?.name || 'N/A'}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {workTypeMap[log.data?.work_type_id] || 'N/A'}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {formatNumber(Number(log.data?.start_reading) || 0)}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {formatNumber(Number(log.data?.end_reading) || 0)}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {formatNumber(netReading)}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {formatNumber(Number(log.data?.price_per_hour) || 0)}
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
-                      {formatNumber(totalPrice)}
+                  {/* E & O.E. */}
+                  <tr>
+                    <td colSpan="2" style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '8px', padding: '2px', border: '1px solid #3075d2' }}>
+                      {labels.eAndOE}
                     </td>
                   </tr>
-                );
-              })}
+                </tbody>
+              </table>
+
+              {/* Certification Text */}
+              <p style={{ margin: '5px 0', fontSize: '9px', fontStyle: 'italic' }}>
+                {labels.certified}
+              </p>
+
+              {/* Signature Section */}
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ margin: '0 0 5px 0', fontSize: '10px', fontWeight: 'bold' }}>
+                  {labels.for} {companyInfo.company_name || 'Kamthe Enterprises'}
+                </p>
+                {companyInfo.sign && (
+                  <div style={{ height: '40px', borderBottom: '1px solid #3075d2', margin: '0 0 5px 0' }}>
+                    <img src={`img/${companyInfo.sign}`} alt="Signature" style={{ maxWidth: '80px', maxHeight: '40px' }} />
+                  </div>
+                )}
+                <p style={{ margin: '0', fontSize: '10px', fontWeight: 'bold' }}>
+                  {labels.authorizedSignatory}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Text */}
+          <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', marginTop: '5px' }}>
+            <p style={{ margin: '0' }}>This invoice is computer generated and authorized.</p>
+          </div>
+        </>
+      ) : (
+        logs.length > 0 && (
+          <div className="section" style={{ marginTop: '2rem', marginBottom: '10px' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                className="table table-bordered"
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  border: '1px solid #3075d2', // Updated border color
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#e7f2fc' }}> {/* Updated header background */}
+                    <th style={{ width: '40px', border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Sr No</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Work Date</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Machine</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Mode</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Operator</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Work Type</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Start Reading</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>End Reading</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Net Reading</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Price per reading</th>
+                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>Total Price</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {logs.map((log, idx) => {
+                    const netReading =
+                      (Number(log.data?.end_reading) || 0) - (Number(log.data?.start_reading) || 0);
+                    const totalPrice = netReading * (Number(log.data?.price_per_hour) || 0);
+
+                    return (
+                      <tr key={log.id}>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {idx + 1}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {(log.data?.work_date || '').toString().slice(0, 10).split('-').reverse().join('-') || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {getMachineName(log.data?.machine_id) || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {prices.find((op) => op.id === log.data?.mode_id)?.mode || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {operators.find(
+                            (op) => String(op.id) === String(log.data?.operator_id)
+                          )?.name || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {workTypeMap[log.data?.work_type_id] || 'N/A'}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {formatNumber(Number(log.data?.start_reading) || 0)}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {formatNumber(Number(log.data?.end_reading) || 0)}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {formatNumber(netReading)}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {formatNumber(Number(log.data?.price_per_hour) || 0)}
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'center' }}>
+                          {formatNumber(totalPrice)}
+                        </td>
+                      </tr>
+                    );
+                  })}
 
 
 
-              {/* Grand Total Row */}
-              {/* {(() => {
+                  {/* Grand Total Row */}
+                  {/* {(() => {
                     const totalNetReading = logs.reduce(
                       (sum, log) =>
                         sum +
@@ -659,181 +663,179 @@ const InvoiceTemplate = ({
                       </tr>
                     );
                   })()} */}
-            </tbody>
-          </table>
-          {/* Additional Charges Table - ADD THIS SECTION */}
-          {formData.additionalCharges && formData.additionalCharges.length > 0 && (
-            <div style={{ marginTop: '10px', marginBottom: '10px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #3075d2' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#e7f2fc' }}>
-                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'left' }}>
-                      Additional Charges
-                    </th>
-                    <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right', width: '150px' }}>
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formData.additionalCharges.map((charge, idx) => (
-                    <tr key={idx}>
-                      <td style={{ border: '1px solid #3075d2', padding: '6px' }}>
-                        {/* {charge.charge_type.replace('_', ' ').toUpperCase()} */}
-                        {formatChargeType(charge.charge_type)}
-                        {charge.remark && (
-                          <div style={{ fontSize: '9px', color: '#666', fontStyle: 'italic', marginTop: '2px' }}>
-                            {charge.remark}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
-                        ₹{formatNumber(Number(charge.amount) || 0)}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
-                      Total Additional Charges:
-                    </td>
-                    <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
-                      ₹{formatNumber(
-                        formData.additionalCharges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0)
-                      )}
-                    </td>
-                  </tr>
                 </tbody>
               </table>
-            </div>
-          )}
-        </div>
-
-        {/* Footer Columns */}
-
-        <div style={{ display: 'flex', gap: '10px', marginTop: '10px', marginBottom: '10px' }}>
-          <div style={{ flex: '1' }}>
-            <div style={{ marginBottom: '5px', border: '1px solid #3075d2' }}>
-              <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', backgroundColor: '#e7f2fc', padding: '4px' }}>
-                {labels.totalInWords}
-              </p>
-              <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', padding: '4px' }}>
-                {calculatedTotalInWords}
-              </p>
-            </div>
-
-          </div>
-          <div style={{ flex: '1' }}>
-
-
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #3075d2' }}>
-              <tbody>
-                {/* ✅ ADDED: Show Logs Total separately if there are additional charges */}
-                {formData.additionalCharges && formData.additionalCharges.length > 0 && (
-                  <tr>
-                    <td style={{ padding: '4px', fontWeight: 'bold' }}>Logs Total</td>
-                    <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
-                      ₹{formatNumber(logsTotal)}
-                    </td>
-                  </tr>
-                )}
-
-                {/* ✅ ADDED: Show Additional Charges Total */}
-                {formData.additionalCharges && formData.additionalCharges.length > 0 && (
-                  <tr>
-                    <td style={{ padding: '4px', fontWeight: 'bold' }}>Additional Charges</td>
-                    <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
-                      ₹{formatNumber(additionalChargesTotal)}
-                    </td>
-                  </tr>
-                )}
-
-                {/* ✅ UPDATED: Changed label based on whether there are additional charges */}
-                <tr>
-                  <td style={{ padding: '4px', fontWeight: 'bold' }}>
-                    {formData.additionalCharges && formData.additionalCharges.length > 0
-                      ? 'Grand Total'
-                      : 'Total Amount'}
-                  </td>
-                  <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
-                    ₹{formatNumber(totalAmount)}
-                  </td>
-                </tr>
-
-                {/* Breakdown of Paid Amount - NO CHANGES HERE */}
-                {(() => {
-                  const totalPaid = formData?.amountPaid || 0;
-                  const advancePaid = formData?.repayments
-                    ?.filter(r => r.from_advance)
-                    ?.reduce((sum, r) => sum + Number(r.payment), 0) || 0;
-                  const cashPaid = Math.max(0, totalPaid - advancePaid);
-
-                  return (
-                    <>
-                      <tr>
-                        <td style={{ padding: '4px', fontWeight: 'bold' }}>{`Paid Amount (Total)`}</td>
-                        <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
-                          ₹{formatNumber(totalPaid)}
+              {/* Additional Charges Table - ADD THIS SECTION */}
+              {formData.additionalCharges && formData.additionalCharges.length > 0 && (
+                <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #3075d2' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#e7f2fc' }}>
+                        <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'left' }}>
+                          Additional Charges
+                        </th>
+                        <th style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right', width: '150px' }}>
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formData.additionalCharges.map((charge, idx) => (
+                        <tr key={idx}>
+                          <td style={{ border: '1px solid #3075d2', padding: '6px' }}>
+                            {/* {charge.charge_type.replace('_', ' ').toUpperCase()} */}
+                            {formatChargeType(charge.charge_type)} {charge.amount_deduct ? '(-)' : '(+)'}
+                            {charge.remark && (
+                              <div style={{ fontSize: '9px', color: '#666', fontStyle: 'italic', marginTop: '2px' }}>
+                                {charge.remark}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right', color: charge.amount_deduct ? 'red' : 'inherit' }}>
+                            {charge.amount_deduct ? '-' : ''}₹{formatNumber(Number(charge.amount) || 0)}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr style={{ backgroundColor: '#e9ecef', fontWeight: 'bold' }}>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
+                          Total Additional Charges:
+                        </td>
+                        <td style={{ border: '1px solid #3075d2', padding: '6px', textAlign: 'right' }}>
+                          ₹{formatNumber(additionalChargesTotal)}
                         </td>
                       </tr>
-                      {advancePaid > 0 && (
-                        <tr style={{ fontSize: '10px', color: '#666' }}>
-                          <td style={{ padding: '2px 4px', fontStyle: 'italic' }}> - From Advance</td>
-                          <td style={{ padding: '2px 4px', textAlign: 'right', fontStyle: 'italic' }}>
-                            ₹{formatNumber(advancePaid)}
-                          </td>
-                        </tr>
-                      )}
-                      {cashPaid > 0 && advancePaid > 0 && (
-                        <tr style={{ fontSize: '10px', color: '#666' }}>
-                          <td style={{ padding: '2px 4px', fontStyle: 'italic' }}> - Direct Payment</td>
-                          <td style={{ padding: '2px 4px', textAlign: 'right', fontStyle: 'italic' }}>
-                            ₹{formatNumber(cashPaid)}
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  );
-                })()}
-
-                {/* ✅ NO CHANGES: Remaining Amount - calculation already uses updated totalAmount */}
-                <tr>
-                  <td style={{ backgroundColor: '#e7f2fc', padding: '4px', fontWeight: 'bold' }}>{`Remaining Amount`}</td>
-                  <td style={{ backgroundColor: '#e7f2fc', padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
-                    ₹{formatNumber(totalAmount - (formData?.amountPaid || 0))}
-                  </td>
-                </tr>
-                <tr>
-                  <td colSpan="2" style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '8px', padding: '2px', border: '1px solid #3075d2' }}>
-                    {labels.eAndOE}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <p style={{ margin: '5px 0', fontSize: '9px', fontStyle: 'italic' }}>
-              {labels.certified}
-            </p>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ margin: '0 0 5px 0', fontSize: '10px', fontWeight: 'bold' }}>
-                {labels.for} {companyInfo.company_name || 'Kamthe Enterprises'}
-              </p>
-              {companyInfo.sign && (
-                <div style={{ height: '40px', borderBottom: '1px solid #3075d2', margin: '0 0 5px 0' }}>
-                  <img src={`img/${companyInfo.sign}`} alt="Signature" style={{ maxWidth: '80px', maxHeight: '40px' }} />
+                    </tbody>
+                  </table>
                 </div>
               )}
-              <p style={{ margin: '0', fontSize: '10px', fontWeight: 'bold' }}>
-                {labels.authorizedSignatory}
-              </p>
+            </div>
+
+            {/* Footer Columns */}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '10px', marginBottom: '10px' }}>
+              <div style={{ flex: '1' }}>
+                <div style={{ marginBottom: '5px', border: '1px solid #3075d2' }}>
+                  <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', backgroundColor: '#e7f2fc', padding: '4px' }}>
+                    {labels.totalInWords}
+                  </p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', padding: '4px' }}>
+                    {calculatedTotalInWords}
+                  </p>
+                </div>
+
+              </div>
+              <div style={{ flex: '1' }}>
+
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #3075d2' }}>
+                  <tbody>
+                    {/* ✅ ADDED: Show Logs Total separately if there are additional charges */}
+                    {formData.additionalCharges && formData.additionalCharges.length > 0 && (
+                      <tr>
+                        <td style={{ padding: '4px', fontWeight: 'bold' }}>Logs Total</td>
+                        <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
+                          ₹{formatNumber(logsTotal)}
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* ✅ ADDED: Show Additional Charges Total */}
+                    {formData.additionalCharges && formData.additionalCharges.length > 0 && (
+                      <tr>
+                        <td style={{ padding: '4px', fontWeight: 'bold' }}>Additional Charges</td>
+                        <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
+                          ₹{formatNumber(additionalChargesTotal)}
+                        </td>
+                      </tr>
+                    )}
+
+                    {/* ✅ UPDATED: Changed label based on whether there are additional charges */}
+                    <tr>
+                      <td style={{ padding: '4px', fontWeight: 'bold' }}>
+                        {formData.additionalCharges && formData.additionalCharges.length > 0
+                          ? 'Grand Total'
+                          : 'Total Amount'}
+                      </td>
+                      <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
+                        ₹{formatNumber(totalAmount)}
+                      </td>
+                    </tr>
+
+                    {/* Breakdown of Paid Amount - NO CHANGES HERE */}
+                    {(() => {
+                      const totalPaid = formData?.amountPaid || 0;
+                      const advancePaid = formData?.repayments
+                        ?.filter(r => r.from_advance)
+                        ?.reduce((sum, r) => sum + Number(r.payment), 0) || 0;
+                      const cashPaid = Math.max(0, totalPaid - advancePaid);
+
+                      return (
+                        <>
+                          <tr>
+                            <td style={{ padding: '4px', fontWeight: 'bold' }}>{`Paid Amount (Total)`}</td>
+                            <td style={{ padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
+                              ₹{formatNumber(totalPaid)}
+                            </td>
+                          </tr>
+                          {advancePaid > 0 && (
+                            <tr style={{ fontSize: '10px', color: '#666' }}>
+                              <td style={{ padding: '2px 4px', fontStyle: 'italic' }}> - From Advance</td>
+                              <td style={{ padding: '2px 4px', textAlign: 'right', fontStyle: 'italic' }}>
+                                ₹{formatNumber(advancePaid)}
+                              </td>
+                            </tr>
+                          )}
+                          {cashPaid > 0 && advancePaid > 0 && (
+                            <tr style={{ fontSize: '10px', color: '#666' }}>
+                              <td style={{ padding: '2px 4px', fontStyle: 'italic' }}> - Direct Payment</td>
+                              <td style={{ padding: '2px 4px', textAlign: 'right', fontStyle: 'italic' }}>
+                                ₹{formatNumber(cashPaid)}
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* ✅ NO CHANGES: Remaining Amount - calculation already uses updated totalAmount */}
+                    <tr>
+                      <td style={{ backgroundColor: '#e7f2fc', padding: '4px', fontWeight: 'bold' }}>{`Remaining Amount`}</td>
+                      <td style={{ backgroundColor: '#e7f2fc', padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>
+                        ₹{formatNumber(totalAmount - (formData?.amountPaid || 0))}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan="2" style={{ textAlign: 'center', fontStyle: 'italic', fontSize: '8px', padding: '2px', border: '1px solid #3075d2' }}>
+                        {labels.eAndOE}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style={{ margin: '5px 0', fontSize: '9px', fontStyle: 'italic' }}>
+                  {labels.certified}
+                </p>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ margin: '0 0 5px 0', fontSize: '10px', fontWeight: 'bold' }}>
+                    {labels.for} {companyInfo.company_name || 'Kamthe Enterprises'}
+                  </p>
+                  {companyInfo.sign && (
+                    <div style={{ height: '40px', borderBottom: '1px solid #3075d2', margin: '0 0 5px 0' }}>
+                      <img src={`img/${companyInfo.sign}`} alt="Signature" style={{ maxWidth: '80px', maxHeight: '40px' }} />
+                    </div>
+                  )}
+                  <p style={{ margin: '0', fontSize: '10px', fontWeight: 'bold' }}>
+                    {labels.authorizedSignatory}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', marginTop: '5px' }}>
+              <p style={{ margin: '0' }}>This invoice is computer generated and authorized.</p>
             </div>
           </div>
-        </div>
-        <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', marginTop: '5px' }}>
-          <p style={{ margin: '0' }}>This invoice is computer generated and authorized.</p>
-        </div>
-      </div>
-    )
-  )
-}
+        )
+      )
+      }
 
 
     </div >
