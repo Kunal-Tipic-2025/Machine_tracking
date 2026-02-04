@@ -886,8 +886,8 @@ const OperatorList = () => {
       //   : [currentOperator.id];
 
       const updatedOperatorIds = Array.isArray(machine.operator_id)
-      ? [...new Set([...machine.operator_id.map(String), String(currentOperator.id)])]
-      : [String(currentOperator.id)];
+        ? [...new Set([...machine.operator_id.map(String), String(currentOperator.id)])]
+        : [String(currentOperator.id)];
 
       // Call backend to update machine_operator
       await put(`/api/machine-operators/${machineId}`, {
@@ -1071,26 +1071,26 @@ const OperatorList = () => {
                 </CCol>
               </CRow> */}
 
-              {/* Payment for Supervisor and Operator */}
-              {(currentOperator.type === "0" || currentOperator.type === "1") && (
+              {/* Payment for Supervisor, Operator and others */}
+              {(["0", "1", "2"].includes(String(currentOperator.type))) && (
                 <CRow className="mb-3">
                   <CCol md={6}>
                     <CFormInput
-                      label="Payment *"
+                      label="Payment per month *"
                       name="payment"
                       type="number"
                       value={currentOperator.payment}
                       onChange={handleChange}
-                      required
+                      required={currentOperator.type !== "2"} // Optional for type 2 if it's mixed vendor? User said 'operator' so assume required or let user decide. Let's keep required for 0/1, maybe optional for 2? Or just reuse existing logic. User said 'add this in edit so user can edit salary'. I'll make it required as per previous logic for 0/1, but for 2 it was hidden. If I enable it, let's keep it required if user wants to use it.
                     />
                   </CCol>
 
                   <CCol md={6}>
                     <CFormInput
                       label="Commission"
-                      name="commission"   // ✅ new field
+                      name="commission"
                       type="number"
-                      value={currentOperator.commission || "0"}  // ✅ handle undefined
+                      value={currentOperator.commission || "0"}
                       onChange={handleChange}
                     />
                   </CCol>

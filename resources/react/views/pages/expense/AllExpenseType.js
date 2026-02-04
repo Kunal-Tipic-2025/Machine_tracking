@@ -31,7 +31,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../common/toast/ToastContext';
 import { useTranslation } from 'react-i18next';
 import { getUserData } from '../../../util/session';
-
+import ExpenseTypeModal from './ExpenseTypeModal';
 
 const AllExpenseType = () => {
   const navigate = useNavigate();
@@ -43,7 +43,11 @@ const AllExpenseType = () => {
   const lng = i18n.language;
   const [searchTerm, setSearchTerm] = useState('');
 
- 
+  // Shared Modal State
+  const [expenseModalVisible, setExpenseModalVisible] = useState(false);
+  const [selectedExpenseType, setSelectedExpenseType] = useState(null);
+
+
 
   // New expense type form state
   const [newExpenseModalVisible, setNewExpenseModalVisible] = useState(false);
@@ -62,22 +66,22 @@ const AllExpenseType = () => {
   const fetchExpenseType = async () => {
     const companyId = getUserData()?.company_id;
 
-  // Optional: Prevent fetch if no company (you can also show an error)
-  if (!companyId) {
-    showToast('danger', 'Unable to determine company. Please log in again.');
-    setIsLoading(false);
-    return;
-  }
+    // Optional: Prevent fetch if no company (you can also show an error)
+    if (!companyId) {
+      showToast('danger', 'Unable to determine company. Please log in again.');
+      setIsLoading(false);
+      return;
+    }
     try {
-     // 1. Pass company_id in query string
-    const response = await getAPICall(`/api/expenseType?company_id=${companyId}`);
+      // 1. Pass company_id in query string
+      const response = await getAPICall(`/api/expenseType?company_id=${companyId}`);
 
-    // 2. Safety: double-filter on client (in case backend doesn't filter)
-    const filtered = Array.isArray(response)
-      ? response.filter(item => item.company_id === companyId)
-      : [];
+      // 2. Safety: double-filter on client (in case backend doesn't filter)
+      const filtered = Array.isArray(response)
+        ? response.filter(item => item.company_id === companyId)
+        : [];
 
-    setExpenseType(filtered);// Keep all fields, including 'id'
+      setExpenseType(filtered);// Keep all fields, including 'id'
       setIsLoading(false)
     } catch (error) {
       showToast('danger', 'Error occurred ' + error);
@@ -90,8 +94,8 @@ const AllExpenseType = () => {
 
   const filteredExpenseTypes = useMemo(() => {
     if (!searchTerm.trim()) return expenseType;
-    
-    return expenseType.filter(expense => 
+
+    return expenseType.filter(expense =>
       expense.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (expense.localName && expense.localName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (expense.expense_category && expense.expense_category.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -124,115 +128,13 @@ const AllExpenseType = () => {
   };
 
   const handleEdit = (p) => {
-    setCurrentExpenseTypeId(p.id);
-    setExpenseTypeForm({
-      name: p.name || '',
-      localName: p.localName || '',
-      expense_category : p.expense_category || '',
-      desc: p.desc || '',
-      show: p.show,
-    });
-    setValidated(false);
-    setEditExpenseModalVisible(true);
+    setSelectedExpenseType(p);
+    setExpenseModalVisible(true);
   };
 
   const handleNewExpenseTypeClick = () => {
-    setExpenseTypeForm({
-      name: '',
-      localName: '',
-      expense_category: '',
-      desc: '',
-      show: 1,
-    });
-    setValidated(false);
-    setNewExpenseModalVisible(true);
-  };
-
-  const handleFormChange = (e) => {
-    const { name, value, type, checked } = e.target;
-
-    if (type === 'checkbox') {
-      setExpenseTypeForm({ ...expenseTypeForm, [name]: checked ? 1 : 0 });
-    } else if (name === 'name') {
-      // Only restrict the main name field to alphanumeric characters
-      const regex = /^[a-zA-Z0-9 ]*$/;
-      if (regex.test(value)) {
-        setExpenseTypeForm({ ...expenseTypeForm, [name]: value });
-      }
-    } else {
-      // Allow all characters for localName and other fields
-      setExpenseTypeForm({ ...expenseTypeForm, [name]: value });
-    }
-  };
-
-  const handleSubmitNewExpenseType = async (event) => {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    setValidated(true);
-
-    if (!expenseTypeForm.name) {
-      return;
-    }
-
-    try {
-      // Create a clean object for submission
-      const submissionData = {
-        name: expenseTypeForm.name,
-        localName: expenseTypeForm.localName || '',
-        expense_category : expenseTypeForm.expense_category || '',
-        desc: expenseTypeForm.desc || '',
-        show: expenseTypeForm.show === 1 ? 1 : 0,
-        // Add the slug functionality here
-        slug: expenseTypeForm.name.replace(/[^\w]/g, '_'), // This will generate a slug
-      };
-
-      const resp = await post('/api/expenseType', submissionData);
-      if (resp) {
-        showToast('success', t("MSG.expense_type_added_successfully_msg") || 'Expense type added successfully');
-        setNewExpenseModalVisible(false);
-        fetchExpenseType();
-      } else {
-        showToast('danger', t("MSG.failed_to_add_expense_type_msg") || 'Error occurred. Please try again later.');
-      }
-    } catch (error) {
-      showToast('danger', 'Error occurred: ' + error);
-    }
-  };
-
-  const handleSubmitEditExpenseType = async (event) => {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    setValidated(true);
-
-    if (!expenseTypeForm.name) {
-      return;
-    }
-
-    try {
-      // Create a clean object for submission
-      const submissionData = {
-        name: expenseTypeForm.name,
-        localName: expenseTypeForm.localName || '',
-        expense_category: expenseTypeForm.expense_category || '',
-        desc: expenseTypeForm.desc || '',
-        show: expenseTypeForm.show === 1 ? 1 : 0,
-      };
-
-      const resp = await put(`/api/expenseType/${currentExpenseTypeId}`, submissionData);
-      if (resp) {
-        showToast('success', t("MSG.expense_type_updated_successfully_msg") || 'Expense type updated successfully');
-        setEditExpenseModalVisible(false);
-        fetchExpenseType();
-      } else {
-        showToast('danger', t("MSG.failed_to_update_expense_type_msg") || 'Error occurred. Please try again later.');
-      }
-    } catch (error) {
-      showToast('danger', 'Error occurred: ' + error);
-    }
+    setSelectedExpenseType(null);
+    setExpenseModalVisible(true);
   };
 
   return (
@@ -811,219 +713,13 @@ const AllExpenseType = () => {
           resource={'Delete expense type - ' + deleteResource?.name}
         />
 
-      {/* New Expense Type Modal */}
-<CModal
-  visible={newExpenseModalVisible}
-  onClose={() => setNewExpenseModalVisible(false)}
-  size="lg"
->
-  <CModalHeader>
-    <CModalTitle>{t("LABELS.new_expense_type") || "New Expense Type"}</CModalTitle>
-  </CModalHeader>
-  <CModalBody>
-    <CForm noValidate validated={validated} onSubmit={handleSubmitNewExpenseType}>
-      <div className="row">
-        <div className="col-sm-6">
-          <div className="mb-3">
-            <CFormLabel htmlFor="name"><b>{t("LABELS.name") || "Name"} *</b></CFormLabel>
-            <CFormInput
-              type="text"
-              id="name"
-              placeholder=""
-              name="name"
-              value={expenseTypeForm.name}
-              onChange={handleFormChange}
-              required
-              feedbackInvalid={t("MSG.please_provide_name_msg") || "Please provide a name. Only alphabets, numbers and spaces are allowed."}
-            />
-          </div>
-        </div>
-        <div className="col-sm-6">
-          <div className="mb-3">
-            <CFormLabel htmlFor="localName"><b>{t("LABELS.local_name") || "Local Name"} *</b></CFormLabel>
-            <CFormInput
-              type="text"
-              id="localName"
-              placeholder=""
-              name="localName"
-              value={expenseTypeForm.localName}
-              onChange={handleFormChange}
-              required
-              feedbackInvalid={t("MSG.please_provide_local_name_msg") || "Please provide a local name."}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="mb-3">
-        <CFormLabel htmlFor="expense_category"><b>{t("LABELS.expense_category")} *</b></CFormLabel>
-        <CFormSelect
-          id="expense_category"
-          name="expense_category"
-          value={expenseTypeForm.expense_category}
-          onChange={handleFormChange}
-          required
-          feedbackInvalid="Please select an expense category."
-        >
-          <option value="">-- Select Category --</option>
-          <option value="Operational Expense">Operational Expense</option>
-          <option value="Capital Expense">Capital Expense</option>
-          <option value="Machine Expense">Machine Expense</option>
-          <option value="Operator Expense">Operator Expense</option>
-          
-        </CFormSelect>
-      </div>
-
-      <div className="row">
-        <div className="col-sm-12">
-          <div className="mb-3">
-            <CFormLabel htmlFor="desc"><b>{t("LABELS.short_desc") || "Short Description"} *</b></CFormLabel>
-            <CFormInput
-              type="text"
-              id="desc"
-              placeholder=""
-              name="desc"
-              value={expenseTypeForm.desc}
-              onChange={handleFormChange}
-              required
-              feedbackInvalid={t("MSG.please_provide_description_msg") || "Please provide a short description."}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="row">
-        <div className="col-sm-6">
-          <div className="mb-3">
-            <CFormCheck
-              id="show"
-              label={t("LABELS.visible") || "Visible"}
-              name="show"
-              checked={expenseTypeForm.show === 1}
-              onChange={handleFormChange}
-            />
-          </div>
-        </div>
-      </div>
-    </CForm>
-  </CModalBody>
-  <CModalFooter>
-    <CButton
-      color="secondary"
-      onClick={() => setNewExpenseModalVisible(false)}
-    >
-      {t("LABELS.cancel") || "Cancel"}
-    </CButton>
-    <CButton
-      color="primary"
-      onClick={handleSubmitNewExpenseType}
-    >
-      {t("LABELS.submit") || "Submit"}
-    </CButton>
-  </CModalFooter>
-</CModal>
-
-        {/* Edit Expense Type Modal */}
-        <CModal
-          visible={editExpenseModalVisible}
-          onClose={() => setEditExpenseModalVisible(false)}
-          size="lg"
-        >
-          <CModalHeader>
-            <CModalTitle>{t("LABELS.edit_expense_type") || "Edit Expense Type"}</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <CForm noValidate validated={validated} onSubmit={handleSubmitEditExpenseType}>
-              <div className="row">
-                <div className="col-sm-6">
-                  <div className="mb-3">
-                    <CFormLabel htmlFor="edit-name"><b>{t("LABELS.name") || "Name"}</b></CFormLabel>
-                    <CFormInput
-                      type="text"
-                      id="edit-name"
-                      placeholder=""
-                      name="name"
-                      value={expenseTypeForm.name}
-                      onChange={handleFormChange}
-                      required
-                      feedbackInvalid={t("MSG.please_provide_name_msg") || "Please provide a name. Only alphabets, numbers and spaces are allowed."}
-                    />
-                  </div>
-                </div>
-                <div className="col-sm-6">
-                  <div className="mb-3">
-                    <CFormLabel htmlFor="edit-localName"><b>{t("LABELS.local_name") || "Local Name"}</b></CFormLabel>
-                    <CFormInput
-                      type="text"
-                      id="edit-localName"
-                      placeholder=""
-                      name="localName"
-                      value={expenseTypeForm.localName}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="mb-3">
-                <CFormLabel htmlFor="expense_category"><b>{t("LABELS.expense_category")}</b></CFormLabel>
-                <CFormSelect
-                  id="expense_category"
-                  name="expense_category"
-                  value={expenseTypeForm.expense_category}
-                  onChange={handleFormChange}
-                  required
-                  feedbackInvalid="Please select an expense category."
-                >
-                  <option value="">-- Select Category --</option>
-                  <option value="Operational Expense">Operational Expense</option>
-                  <option value="Capital Expense">Capital Expense</option>
-                  <option value="Machine Expense">Machine Expense</option>
-                  <option value="Operator Expense">Operator Expense</option>
-                </CFormSelect>
-              </div>
-              <div className="row">
-                <div className="col-sm-12">
-                  <div className="mb-3">
-                    <CFormLabel htmlFor="edit-desc"><b>{t("LABELS.short_desc") || "Short Description"}</b></CFormLabel>
-                    <CFormInput
-                      type="text"
-                      id="edit-desc"
-                      placeholder=""
-                      name="desc"
-                      value={expenseTypeForm.desc}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="row">
-                <div className="col-sm-6">
-                  <div className="mb-3">
-                    <CFormCheck
-                      id="edit-show"
-                      label={t("LABELS.visible") || "Visible"}
-                      name="show"
-                      checked={expenseTypeForm.show === 1}
-                      onChange={handleFormChange}
-                    />
-                  </div>
-                </div>
-              </div>
-            </CForm>
-          </CModalBody>
-          <CModalFooter>
-            <CButton
-              color="secondary"
-              onClick={() => setEditExpenseModalVisible(false)}
-            >
-              {t("LABELS.cancel") || "Cancel"}
-            </CButton>
-            <CButton
-              color="primary"
-              onClick={handleSubmitEditExpenseType}
-            >
-              {t("LABELS.update") || "Update"}
-            </CButton>
-          </CModalFooter>
-        </CModal>
+        {/* Shared Expense Type Modal */}
+        <ExpenseTypeModal
+          visible={expenseModalVisible}
+          onClose={() => setExpenseModalVisible(false)}
+          onSuccess={fetchExpenseType}
+          editData={selectedExpenseType}
+        />
 
         <CCol xs={12}>
           <CCard className="mb-4">
@@ -1047,140 +743,140 @@ const AllExpenseType = () => {
                   borderRadius: '8px',
                   backgroundColor: '#fff'
                 }}>
-                <CTable hover striped bordered color="light" className="mb-0">
-                  <CTableHead style={{ position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10 }}>
-                    <CTableRow>
-                      
-                      <CTableHeaderCell scope="col" className="text-center align-middle">
-                        {t("LABELS.name") || "Name"}
-                      </CTableHeaderCell>
-                      <CTableHeaderCell scope="col" className="text-center align-middle">
-                        {t("LABELS.local_name") || "Local Name"}
-                      </CTableHeaderCell>
-                      <CTableHeaderCell scope="col" className="text-center align-middle">
-                        {t("LABELS.expense_category") || "Category"}
-                      </CTableHeaderCell>
-                      <CTableHeaderCell scope="col" className="text-center align-middle">
-                        {t("LABELS.short_desc") || "Description"}
-                      </CTableHeaderCell>
-                      <CTableHeaderCell scope="col" className="text-center align-middle">
-                        {t("LABELS.status") || "Status"}
-                      </CTableHeaderCell>
-                      <CTableHeaderCell scope="col" className="text-center align-middle">
-                        {t("LABELS.actions") || "Actions"}
-                      </CTableHeaderCell>
-                    </CTableRow>
-                  </CTableHead>
-                  <CTableBody>
-                    {filteredExpenseTypes.length === 0 ? (
+                  <CTable hover striped bordered color="light" className="mb-0">
+                    <CTableHead style={{ position: 'sticky', top: 0, backgroundColor: '#f8f9fa', zIndex: 10 }}>
                       <CTableRow>
-                        <CTableDataCell colSpan={7} className="empty-state">
-                          <div className="empty-state-icon">
-                            📋
-                          </div>
-                          <div>
-                            {searchTerm ? 
-                              (t('LABELS.no_expense_types_found') || 'No expense types found matching your search') : 
-                              (t('LABELS.no_expense_types_available') || 'No expense types available. Create your first expense type!')
-                            }
-                          </div>
-                          {searchTerm && (
-                            <small className="mt-2 d-block">
-                              Try adjusting your search terms or{' '}
-                              <button 
-                                className="btn btn-link p-0 text-decoration-underline"
-                                onClick={() => setSearchTerm('')}
-                              >
-                                clear the search
-                              </button>
-                            </small>
-                          )}
-                        </CTableDataCell>
+
+                        <CTableHeaderCell scope="col" className="text-center align-middle">
+                          {t("LABELS.name") || "Name"}
+                        </CTableHeaderCell>
+                        <CTableHeaderCell scope="col" className="text-center align-middle">
+                          {t("LABELS.local_name") || "Local Name"}
+                        </CTableHeaderCell>
+                        <CTableHeaderCell scope="col" className="text-center align-middle">
+                          {t("LABELS.expense_category") || "Category"}
+                        </CTableHeaderCell>
+                        <CTableHeaderCell scope="col" className="text-center align-middle">
+                          {t("LABELS.short_desc") || "Description"}
+                        </CTableHeaderCell>
+                        <CTableHeaderCell scope="col" className="text-center align-middle">
+                          {t("LABELS.status") || "Status"}
+                        </CTableHeaderCell>
+                        <CTableHeaderCell scope="col" className="text-center align-middle">
+                          {t("LABELS.actions") || "Actions"}
+                        </CTableHeaderCell>
                       </CTableRow>
-                    ) : (
-                      filteredExpenseTypes.map((expense, index) => (
-                        <CTableRow key={expense.id}>
-                          
-                          <CTableDataCell className="name-col">
-                            <div style={{ fontWeight: '500' }} title={expense.name}>
-                              <div className="text-truncate-custom">
-                                {expense.name}
-                              </div>
+                    </CTableHead>
+                    <CTableBody>
+                      {filteredExpenseTypes.length === 0 ? (
+                        <CTableRow>
+                          <CTableDataCell colSpan={7} className="empty-state">
+                            <div className="empty-state-icon">
+                              📋
                             </div>
-                          </CTableDataCell>
-                          <CTableDataCell className="local-name-col">
-                            <div title={expense.localName || 'No local name'}>
-                              <div className="text-truncate-custom">
-                                {expense.localName || '-'}
-                              </div>
-                            </div>
-                          </CTableDataCell>
-                          <CTableDataCell className="category-col">
-                            <div title={expense.expense_category || 'No category'}>
-                              <div className="text-truncate-custom">
-                                {expense.expense_category || '-'}
-                              </div>
-                            </div>
-                          </CTableDataCell>
-                          <CTableDataCell className="desc-col">
-                            <div title={expense.desc || 'No description'}>
-                              <div className="text-truncate-custom">
-                                {expense.desc || '-'}
-                              </div>
-                            </div>
-                          </CTableDataCell>
-                          <CTableDataCell className="status-col">
-                            <CBadge 
-                              color={expense.show === 1 ? 'success' : 'danger'}
-                              className={expense.show === 1 ? 'badge-visible' : 'badge-hidden'}
-                            >
-                              {expense.show === 1 ? 
-                                (t('LABELS.visible') || 'Visible') : 
-                                (t('LABELS.hidden') || 'Hidden')
+                            <div>
+                              {searchTerm ?
+                                (t('LABELS.no_expense_types_found') || 'No expense types found matching your search') :
+                                (t('LABELS.no_expense_types_available') || 'No expense types available. Create your first expense type!')
                               }
-                            </CBadge>
-                          </CTableDataCell>
-                          <CTableDataCell className="actions-col">
-                            <div className="action-buttons">
-                              <CBadge
-                                role="button"
-                                color="info"
-                                onClick={() => handleEdit(expense)}
-                                style={{ cursor: 'pointer' }}
-                                title={`Edit ${expense.name}`}
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    handleEdit(expense);
-                                  }
-                                }}
-                              >
-                                {t("LABELS.edit") || "Edit"}
-                              </CBadge>
-                              <CBadge
-                                role="button"
-                                color="danger"
-                                onClick={() => handleDelete(expense)}
-                                style={{ cursor: 'pointer' }}
-                                title={`Delete ${expense.name}`}
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    handleDelete(expense);
-                                  }
-                                }}
-                              >
-                                {t("LABELS.delete") || "Delete"}
-                              </CBadge>
                             </div>
+                            {searchTerm && (
+                              <small className="mt-2 d-block">
+                                Try adjusting your search terms or{' '}
+                                <button
+                                  className="btn btn-link p-0 text-decoration-underline"
+                                  onClick={() => setSearchTerm('')}
+                                >
+                                  clear the search
+                                </button>
+                              </small>
+                            )}
                           </CTableDataCell>
                         </CTableRow>
-                      ))
-                    )}
-                  </CTableBody>
-                </CTable>
+                      ) : (
+                        filteredExpenseTypes.map((expense, index) => (
+                          <CTableRow key={expense.id}>
+
+                            <CTableDataCell className="name-col">
+                              <div style={{ fontWeight: '500' }} title={expense.name}>
+                                <div className="text-truncate-custom">
+                                  {expense.name}
+                                </div>
+                              </div>
+                            </CTableDataCell>
+                            <CTableDataCell className="local-name-col">
+                              <div title={expense.localName || 'No local name'}>
+                                <div className="text-truncate-custom">
+                                  {expense.localName || '-'}
+                                </div>
+                              </div>
+                            </CTableDataCell>
+                            <CTableDataCell className="category-col">
+                              <div title={expense.expense_category || 'No category'}>
+                                <div className="text-truncate-custom">
+                                  {expense.expense_category || '-'}
+                                </div>
+                              </div>
+                            </CTableDataCell>
+                            <CTableDataCell className="desc-col">
+                              <div title={expense.desc || 'No description'}>
+                                <div className="text-truncate-custom">
+                                  {expense.desc || '-'}
+                                </div>
+                              </div>
+                            </CTableDataCell>
+                            <CTableDataCell className="status-col">
+                              <CBadge
+                                color={expense.show === 1 ? 'success' : 'danger'}
+                                className={expense.show === 1 ? 'badge-visible' : 'badge-hidden'}
+                              >
+                                {expense.show === 1 ?
+                                  (t('LABELS.visible') || 'Visible') :
+                                  (t('LABELS.hidden') || 'Hidden')
+                                }
+                              </CBadge>
+                            </CTableDataCell>
+                            <CTableDataCell className="actions-col">
+                              <div className="action-buttons">
+                                <CBadge
+                                  role="button"
+                                  color="info"
+                                  onClick={() => handleEdit(expense)}
+                                  style={{ cursor: 'pointer' }}
+                                  title={`Edit ${expense.name}`}
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleEdit(expense);
+                                    }
+                                  }}
+                                >
+                                  {t("LABELS.edit") || "Edit"}
+                                </CBadge>
+                                <CBadge
+                                  role="button"
+                                  color="danger"
+                                  onClick={() => handleDelete(expense)}
+                                  style={{ cursor: 'pointer' }}
+                                  title={`Delete ${expense.name}`}
+                                  tabIndex={0}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleDelete(expense);
+                                    }
+                                  }}
+                                >
+                                  {t("LABELS.delete") || "Delete"}
+                                </CBadge>
+                              </div>
+                            </CTableDataCell>
+                          </CTableRow>
+                        ))
+                      )}
+                    </CTableBody>
+                  </CTable>
                 </div>
               </div>
             </CCardBody>

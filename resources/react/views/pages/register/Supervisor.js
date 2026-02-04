@@ -678,7 +678,7 @@ const SupervisorsList = () => {
                             <CTableDataCell>{u.mobile}</CTableDataCell>
                             <CTableDataCell>{u.address}</CTableDataCell>
                             <CTableDataCell>
-                              {u.type === 0 ? "Super Admin" : u.type === 1 ? "Admin" :  u.type === 2 ? "Operator": "Helper"}
+                              {u.type === 0 ? "Super Admin" : u.type === 1 ? "Admin" : u.type === 2 ? "Operator" : "Helper"}
                             </CTableDataCell>
                             <CTableDataCell>{u.payment}</CTableDataCell>
                             <CTableDataCell>
@@ -1126,8 +1126,8 @@ const SupervisorsList = () => {
                 </div>
               </div>
 
-              {/* Payment Input for Operators */}
-              {editSupervisor.type === 2 || 3 && (
+              {/* Payment Input for Operators and Helpers */}
+              {([2, 4].includes(parseInt(editSupervisor.type))) && (
                 <div className="mb-3">
                   <CFormInput
                     label="Payment per Month"
@@ -1168,7 +1168,7 @@ const SupervisorsList = () => {
 
 
               {/* Add Machine Dropdown */}
-             {editSupervisor.type === 2 &&  <CFormSelect
+              {editSupervisor.type === 2 && <CFormSelect
                 className="mb-3"
                 label="Add Machine"
                 value=""
@@ -1191,71 +1191,71 @@ const SupervisorsList = () => {
               </CFormSelect>}
 
               {/* Allocated Machines List */}
-              {editSupervisor.type === 2 && 
-              <div className="mt-4">
-                <label className="form-label"><strong>Allocated Machines</strong></label>
+              {editSupervisor.type === 2 &&
+                <div className="mt-4">
+                  <label className="form-label"><strong>Allocated Machines</strong></label>
 
-                <div
-                  className="p-2 border rounded bg-light"
-                  style={{ maxHeight: "250px", overflowY: "auto" }}
-                >
-                  {machines
-                    .filter((m) => {
+                  <div
+                    className="p-2 border rounded bg-light"
+                    style={{ maxHeight: "250px", overflowY: "auto" }}
+                  >
+                    {machines
+                      .filter((m) => {
+                        const isAssigned =
+                          Array.isArray(m.operator_id) &&
+                          m.operator_id.map(String).includes(String(editSupervisor.id));
+
+                        const isPendingAdd = editMachines.adds.includes(String(m.id));
+                        const isPendingRemove = editMachines.removes.includes(String(m.id));
+
+                        // ✅ Show only machines that are assigned or newly added, not removed
+                        return (isAssigned || isPendingAdd) && !isPendingRemove;
+                      })
+                      .map((m) => {
+                        const isPendingAdd = editMachines.adds.includes(String(m.id));
+
+                        return (
+                          <div
+                            key={m.id}
+                            className="d-flex justify-content-between align-items-center mb-2"
+                          >
+                            <span>
+                              • {m.machine_name}
+                              {isPendingAdd && (
+                                <small className="text-success ms-2"></small>
+                              )}
+                            </span>
+
+                            <CButton
+                              color="danger"
+                              size="sm"
+                              onClick={() => {
+                                // 🔹 Instantly remove from frontend view
+                                setEditMachines((prev) => ({
+                                  ...prev,
+                                  removes: [...prev.removes, String(m.id)],
+                                  adds: prev.adds.filter((id) => id !== String(m.id)), // if it was newly added, remove from adds too
+                                }));
+                              }}
+                            >
+                              Remove
+                            </CButton>
+                          </div>
+                        );
+                      })}
+
+                    {/* 🔹 No machines allocated */}
+                    {machines.filter((m) => {
                       const isAssigned =
                         Array.isArray(m.operator_id) &&
                         m.operator_id.map(String).includes(String(editSupervisor.id));
-
                       const isPendingAdd = editMachines.adds.includes(String(m.id));
                       const isPendingRemove = editMachines.removes.includes(String(m.id));
 
-                      // ✅ Show only machines that are assigned or newly added, not removed
                       return (isAssigned || isPendingAdd) && !isPendingRemove;
-                    })
-                    .map((m) => {
-                      const isPendingAdd = editMachines.adds.includes(String(m.id));
-
-                      return (
-                        <div
-                          key={m.id}
-                          className="d-flex justify-content-between align-items-center mb-2"
-                        >
-                          <span>
-                            • {m.machine_name}
-                            {isPendingAdd && (
-                              <small className="text-success ms-2"></small>
-                            )}
-                          </span>
-
-                          <CButton
-                            color="danger"
-                            size="sm"
-                            onClick={() => {
-                              // 🔹 Instantly remove from frontend view
-                              setEditMachines((prev) => ({
-                                ...prev,
-                                removes: [...prev.removes, String(m.id)],
-                                adds: prev.adds.filter((id) => id !== String(m.id)), // if it was newly added, remove from adds too
-                              }));
-                            }}
-                          >
-                            Remove
-                          </CButton>
-                        </div>
-                      );
-                    })}
-
-                  {/* 🔹 No machines allocated */}
-                  {machines.filter((m) => {
-                    const isAssigned =
-                      Array.isArray(m.operator_id) &&
-                      m.operator_id.map(String).includes(String(editSupervisor.id));
-                    const isPendingAdd = editMachines.adds.includes(String(m.id));
-                    const isPendingRemove = editMachines.removes.includes(String(m.id));
-
-                    return (isAssigned || isPendingAdd) && !isPendingRemove;
-                  }).length === 0 && <div className="text-muted">No machines allocated</div>}
-                </div>
-              </div>}
+                    }).length === 0 && <div className="text-muted">No machines allocated</div>}
+                  </div>
+                </div>}
 
             </>
           )}

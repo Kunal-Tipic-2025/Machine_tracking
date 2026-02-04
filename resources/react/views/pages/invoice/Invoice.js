@@ -29,6 +29,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../../common/toast/ToastContext'
 import { useTranslation } from 'react-i18next'
 import ChargeTypeModal from './ChargeTypeModal'
+import NewCustomerModal from './NewCustomerModal'
 
 const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
   const [validated, setValidated] = useState(false)
@@ -97,12 +98,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
   const [editingLogPrice, setEditingLogPrice] = useState('')
 
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false)
-  const [newCustomerForm, setNewCustomerForm] = useState({
-    customer_name: '',
-    mobile_number: '',
-    gst_number: '',
-    work_place: '',
-  })
+  const [initialCustomerName, setInitialCustomerName] = useState('')
 
 
 
@@ -550,129 +546,20 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
   const handleAddCustomer = () => {
     setShowDropdown(false)
-    setNewCustomerForm((prev) => ({
-      ...prev,
-      customer_name: searchQuery || '',
-    }))
+    setInitialCustomerName(searchQuery || '')
     setShowAddCustomerModal(true)
   }
 
-  const handleNewCustomerChange = (e) => {
-    const { name, value } = e.target
-
-    if (name === 'mobile_number') {
-      const digits = value.replace(/\D/g, '')
-      if (digits.length > 10) return
-      setNewCustomerForm((prev) => ({ ...prev, mobile_number: digits }))
-      return
+  const handleNewCustomerSuccess = (newlyCreatedProject) => {
+    if (newlyCreatedProject) {
+      handleProjectChange(newlyCreatedProject)
+      showToast('success', 'Customer added and selected successfully')
+    } else {
+      showToast('success', 'Customer added successfully, please search to select')
     }
-
-    if (name === 'gst_number') {
-      if (value.length > 15) return
-      setNewCustomerForm((prev) => ({ ...prev, gst_number: value }))
-      return
-    }
-
-    setNewCustomerForm((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleNewCustomerSubmit = async (e) => {
-    e.preventDefault()
-
-    if (!newCustomerForm.customer_name.trim()) {
-      showToast('danger', 'Customer name is required')
-      return
-    }
-
-    if (!newCustomerForm.mobile_number || !/^[6-9]\d{9}$/.test(newCustomerForm.mobile_number)) {
-      showToast('danger', 'Please enter a valid 10-digit mobile number')
-      return
-    }
-
-    try {
-      setLoading(true)
-      const payload = {
-        customer_name: newCustomerForm.customer_name,
-        mobile_number: newCustomerForm.mobile_number,
-        gst_number: newCustomerForm.gst_number || '',
-        work_place: newCustomerForm.work_place || '',
-        project_name: '',
-        project_cost: '',
-        supervisor_id: '',
-        commission: '',
-        start_date: '',
-        end_date: '',
-        is_visible: true,
-        remark: '',
-        operator_id: [''],
-        machine_id: [],
-      }
-
-      await post('/api/projects', payload)
-
-      let newlyCreatedProject = null
-      try {
-        const searchResp = await getAPICall(`/api/projects?searchQuery=${encodeURIComponent(newCustomerForm.customer_name)}`)
-        const data = Array.isArray(searchResp) ? searchResp : searchResp?.data
-
-        if (data && Array.isArray(data)) {
-          const mapped = data
-            .map((p) => ({
-              id: p.id,
-              project_name: p.project_name || 'Unknown Project',
-              customer_name: p.customer_name || 'Unknown Customer',
-              work_place: p.work_place || '',
-              project_cost: p.project_cost || '0',
-              mobile_number: p.mobile_number || '',
-              gst_number: p.gst_number || '',
-              remark: p.remark || '',
-              paidamount: p.paidamount || 0,
-              customer_id: p.customer_id || p.id,
-              company_id: p.company_id,
-              machine_id: p.machine_id || [],
-              customer: {
-                name: p.customer_name || 'Unknown',
-                address: p.work_place || 'N/A',
-                mobile: p.mobile_number || 'N/A',
-              },
-              start_date: p.start_date,
-              end_date: p.end_date,
-            }))
-            .filter((p) => p.project_name && p.customer_id)
-
-          newlyCreatedProject =
-            mapped.find(
-              (p) =>
-                p.customer_name.toLowerCase() === newCustomerForm.customer_name.toLowerCase() &&
-                p.mobile_number === newCustomerForm.mobile_number
-            ) || mapped[0] || null
-        }
-      } catch (innerErr) {
-        console.error('Error fetching newly created customer project:', innerErr)
-      }
-
-      if (newlyCreatedProject) {
-        handleProjectChange(newlyCreatedProject)
-        showToast('success', 'Customer added and selected successfully')
-      } else {
-        showToast('success', 'Customer added successfully, please search to select')
-      }
-
-      setShowAddCustomerModal(false)
-      setNewCustomerForm({
-        customer_name: '',
-        mobile_number: '',
-        gst_number: '',
-        work_place: '',
-      })
-      setAllProjects([])
-      setFilteredProjects([])
-    } catch (error) {
-      console.error('Error adding customer from invoice:', error)
-      showToast('danger', 'Failed to add customer')
-    } finally {
-      setLoading(false)
-    }
+    setShowAddCustomerModal(false)
+    setAllProjects([])
+    setFilteredProjects([])
   }
 
   const handleFormChange = (e) => {
@@ -1772,67 +1659,12 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
               </CButton>
             </CForm>
 
-            <CModal visible={showAddCustomerModal} onClose={() => setShowAddCustomerModal(false)}>
-              <CModalHeader closeButton>Add New Customer</CModalHeader>
-              <CModalBody>
-                <CForm onSubmit={handleNewCustomerSubmit}>
-                  <CRow className="g-3">
-                    <CCol md={12}>
-                      <CFormLabel>Customer Name</CFormLabel>
-                      <CFormInput
-                        type="text"
-                        name="customer_name"
-                        value={newCustomerForm.customer_name}
-                        onChange={handleNewCustomerChange}
-                        placeholder="Enter Customer Name..."
-                        required
-                      />
-                    </CCol>
-                    <CCol md={12}>
-                      <CFormLabel>Mobile Number</CFormLabel>
-                      <CFormInput
-                        type="text"
-                        name="mobile_number"
-                        value={newCustomerForm.mobile_number}
-                        onChange={handleNewCustomerChange}
-                        placeholder="Enter Customer Mobile..."
-                        maxLength={10}
-                        required
-                      />
-                    </CCol>
-                    <CCol md={12}>
-                      <CFormLabel>GST Number (Optional)</CFormLabel>
-                      <CFormInput
-                        type="text"
-                        name="gst_number"
-                        value={newCustomerForm.gst_number}
-                        onChange={handleNewCustomerChange}
-                        placeholder="Enter GST number..."
-                        maxLength={15}
-                      />
-                    </CCol>
-                    <CCol md={12}>
-                      <CFormLabel>Location</CFormLabel>
-                      <CFormInput
-                        type="text"
-                        name="work_place"
-                        value={newCustomerForm.work_place}
-                        onChange={handleNewCustomerChange}
-                        placeholder="Enter Location..."
-                      />
-                    </CCol>
-                  </CRow>
-                </CForm>
-              </CModalBody>
-              <CModalFooter>
-                <CButton color="secondary" variant="outline" onClick={() => setShowAddCustomerModal(false)}>
-                  Cancel
-                </CButton>
-                <CButton color="primary" onClick={handleNewCustomerSubmit} disabled={loading}>
-                  {loading ? 'Saving...' : 'Save Customer'}
-                </CButton>
-              </CModalFooter>
-            </CModal>
+            <NewCustomerModal
+              visible={showAddCustomerModal}
+              onClose={() => setShowAddCustomerModal(false)}
+              onSuccess={handleNewCustomerSuccess}
+              initialName={initialCustomerName}
+            />
           </CCardBody>
         </CCard>
       </CCol>

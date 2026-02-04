@@ -61,8 +61,9 @@ const ExpenseReport = () => {
   const [hasMorePages, setHasMorePages] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [gstFilter, setGstFilter] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState('');
-  const [allCustomers, setAllCustomers] = useState([]);
+  const [selectedMachine, setSelectedMachine] = useState('');
+  const [machineries, setMachineries] = useState([]);
+  const [selectedExpenseFilter, setSelectedExpenseFilter] = useState('');
 
   // Helper to get current month dates
   const getMonthDates = () => {
@@ -98,20 +99,21 @@ const ExpenseReport = () => {
   const scrollPositionRef = useRef(0);
   const isInfiniteScrollingRef = useRef(false);
 
-  // Fetch all customers on mount
-  const fetchCustomers = async () => {
+  // Fetch machineries
+  const fetchMachineries = async () => {
     try {
-      const response = await getAPICall('/api/myProjects');
-      const uniqueNames = [...new Set(response.map(p => p.customer_name).filter(n => n))].sort();
-      setAllCustomers(uniqueNames);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
+      const res = await getAPICall('/api/machine-operators');
+      if (Array.isArray(res)) {
+        setMachineries(res);
+      }
+    } catch (err) {
+      console.error('Error fetching machineries:', err);
     }
   };
 
   // Fetch on mount
   useEffect(() => {
-    fetchCustomers();
+    fetchMachineries();
     fetchExpense();
   }, []);
 
@@ -214,8 +216,10 @@ const ExpenseReport = () => {
     }
 
     try {
-      const url = `/api/expense?company_id=${userData.company_id}&startDate=${state.start_date}&endDate=${state.end_date}` +
-        (nextCursor && !reset ? `&cursor=${nextCursor}` : '');
+      let url = `/api/expense?company_id=${userData.company_id}&startDate=${state.start_date}&endDate=${state.end_date}`;
+      if (selectedMachine) url += `&machineId=${selectedMachine}`;
+      if (selectedExpenseFilter) url += `&expenseId=${selectedExpenseFilter}`;
+      if (nextCursor && !reset) url += `&cursor=${nextCursor}`;
       const response = await getAPICall(url);
 
       if (response.error) {
@@ -319,7 +323,7 @@ const ExpenseReport = () => {
     const worksheetData = sortedFilteredExpenses.map((expense, index) => ({
       'Sr No': expense.sr_no,
       'Date': formatDate(expense.expense_date),
-      'Customer Name': expense.customer_name || '-',
+      'Machine Name': expense.machine_name || '-',
       'Expense Details': expenseType[expense.expense_id] || '-',
       'About Expense': expense.desc || '-',
       'Amount': expense.total_price,
@@ -345,11 +349,11 @@ const ExpenseReport = () => {
     const margin = 40;
     const usableWidth = pageWidth - 2 * margin;
 
-    const tableColumn = ['Sr No', 'Date', 'Customer Name', 'Expense Details', 'About', 'Amount'];
+    const tableColumn = ['Sr No', 'Date', 'Machine Name', 'Expense Details', 'About', 'Amount'];
     const tableRows = sortedFilteredExpenses.map((expense) => [
       expense.sr_no,
       formatDate(expense.expense_date),
-      expense.customer_name || '-',
+      expense.machine_name || '-',
       expenseType[expense.expense_id] || '-',
       expense.desc || '-',
       `INR ${formatIndianNumber(expense.total_price)}`,
@@ -443,8 +447,11 @@ const ExpenseReport = () => {
       sr_no: index + 1,
     }));
 
-    if (selectedCustomer) {
-      filtered = filtered.filter(expense => expense.customer_name === selectedCustomer);
+    if (selectedMachine) {
+      // Backend filtering is used, but if expenses array is ever used locally without fetch, this keeps consistency?
+      // Actually, expenses are replaced on fetch, so this filter is redundant if fetch does the job.
+      // But `expenses` contains fetched data. 
+      // Let's rely on backend filtering and REMOVE this frontend filter block as it might hide data if pagination logic mismatches.
     }
 
     if (searchTerm.trim()) {
@@ -489,7 +496,7 @@ const ExpenseReport = () => {
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [expenses, searchTerm, sortConfig, expenseType, gstFilter, selectedCustomer]);
+  }, [expenses, searchTerm, sortConfig, expenseType, gstFilter, selectedMachine]);
 
   const displayTotalExpense = useMemo(() => {
     return sortedFilteredExpenses.reduce((sum, item) => sum + (parseFloat(item.total_price) || 0), 0);
@@ -772,17 +779,30 @@ const ExpenseReport = () => {
                       feedbackInvalid="Please select end date."
                     />
                   </div>
-                  <div className="col-sm-3">
-                    <CFormLabel>Filter by Customer</CFormLabel>
+                  <div className="col-sm-2">
+                    <CFormLabel>Filter by Machine</CFormLabel>
                     <CFormSelect
-                      value={selectedCustomer}
-                      onChange={(e) => setSelectedCustomer(e.target.value)}
-                      aria-label="Filter by Customer"
+                      value={selectedMachine}
+                      onChange={(e) => setSelectedMachine(e.target.value)}
                     >
-                      <option value="">All Customers</option>
-                      {allCustomers.map((customer, index) => (
-                        <option key={index} value={customer}>
-                          {customer}
+                      <option value="">All Machines</option>
+                      {machineries.map((machine) => (
+                        <option key={machine.id} value={machine.id}>
+                          {machine.machine_name} {machine.model_number ? `(${machine.model_number})` : ''}
+                        </option>
+                      ))}
+                    </CFormSelect>
+                  </div>
+                  <div className="col-sm-2">
+                    <CFormLabel>Filter by Expense</CFormLabel>
+                    <CFormSelect
+                      value={selectedExpenseFilter}
+                      onChange={(e) => setSelectedExpenseFilter(e.target.value)}
+                    >
+                      <option value="">All Expenses</option>
+                      {Object.entries(expenseType).map(([id, name]) => (
+                        <option key={id} value={id}>
+                          {name}
                         </option>
                       ))}
                     </CFormSelect>
@@ -898,10 +918,10 @@ const ExpenseReport = () => {
                               <div className="value-text">{formattedDate}</div>
                             </div>
 
-                            {/* Row 3: Customer Name */}
+                            {/* Row 3: Machine Name */}
                             <div className="card-row-2">
-                              <div className="label-text">Customer Name</div>
-                              <div className="value-text">{expense.customer_name || '-'}</div>
+                              <div className="label-text">Machine Name</div>
+                              <div className="value-text">{expense.machine_name || '-'}</div>
                             </div>
 
                             {/* Row 4: Expense Details */}
@@ -939,7 +959,7 @@ const ExpenseReport = () => {
                         <CTableRow>
                           <CTableHeaderCell className="text-center align-middle">Sr. No.</CTableHeaderCell>
                           <CTableHeaderCell className="text-center align-middle">Date</CTableHeaderCell>
-                          <CTableHeaderCell className="text-center align-middle">Customer Name</CTableHeaderCell>
+                          <CTableHeaderCell className="text-center align-middle">Machine Name</CTableHeaderCell>
                           <CTableHeaderCell className="text-center align-middle">Expense Details</CTableHeaderCell>
                           <CTableHeaderCell className="text-center align-middle">About</CTableHeaderCell>
                           <CTableHeaderCell className="text-center align-middle">Amount</CTableHeaderCell>
@@ -973,7 +993,7 @@ const ExpenseReport = () => {
                                 <CTableDataCell><div>{expense.sr_no || '-'}</div></CTableDataCell>
                                 <CTableDataCell><div>{formatDate(expense.expense_date) || '-'}</div></CTableDataCell>
                                 <CTableDataCell>
-                                  <div style={{ wordBreak: 'break-word' }}>{expense.customer_name || '-'}</div>
+                                  <div style={{ wordBreak: 'break-word' }}>{expense.machine_name || '-'}</div>
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <div style={{ wordBreak: 'break-word' }}>{expenseType[expense.expense_id] || '-'}</div>

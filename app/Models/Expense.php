@@ -121,6 +121,7 @@ class Expense extends Model
         'transaction_id',
         'machine_id',
         'customer_id',
+        'operator_id',
     ];
 
     /**
@@ -154,6 +155,11 @@ class Expense extends Model
      */
     public function machine()
     {
-        return $this->belongsTo(Machinery::class, 'machine_id');
+        return $this->belongsTo(MachineOperator::class, 'machine_id');
+    }
+
+    public function operator()
+    {
+        return $this->belongsTo(User::class, 'operator_id');
     }
 }

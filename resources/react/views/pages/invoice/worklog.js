@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import { useToast } from '../../common/toast/ToastContext';
 import { getUserType, getUserData } from '../../../util/session';
+import NewCustomerModal from './NewCustomerModal';
 
 // Get today's date in YYYY-MM-DD format
 const getTodayDate = () => {
@@ -90,27 +91,10 @@ const MachineUsageForm = () => {
   const [workTypeSearchQuery, setWorkTypeSearchQuery] = useState({});
   const [showWorkTypeDropdown, setShowWorkTypeDropdown] = useState({});
 
-  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
-  const [newProjectFormData, setNewProjectFormData] = useState({
-    customer_name: "",
-    mobile_number: "",
-    // project_name: "",
-    project_cost: "",
-    supervisor_id: "",
-    work_place: "",
-    commission: "",
-    start_date: "",
-    end_date: "",
-    is_visible: true,
-    remark: "",
-    gst_number: "",
-    operator_id: [""],
-  });
-  const [newProjectErrors, setNewProjectErrors] = useState({});
-  const [newProjectLoading, setNewProjectLoading] = useState(false);
-  const [newProjectOperators, setNewProjectOperators] = useState([]);
-  const [newProjectMachines, setNewProjectMachines] = useState([]);
-  const [newProjectOperatorMachines, setNewProjectOperatorMachines] = useState({});
+  // New Customer Modal State (Simpler version)
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [initialCustomerName, setInitialCustomerName] = useState('');
+
   const [cameraError, setCameraError] = useState(false);
   const [workTypes, setWorkTypes] = useState([]);
   useEffect(() => {
@@ -166,40 +150,9 @@ const MachineUsageForm = () => {
     resetForm();
   }, [resetForm]);
 
-  useEffect(() => {
-    const fetchOperators = async () => {
-      try {
-        const res = await getAPICall("/api/operatorsByCompanyIdOperator");
-        setNewProjectOperators(res || []);
-      } catch (err) {
-        console.error("Error fetching operators:", err);
-      }
-    };
 
-    const fetchMachines = async () => {
-      try {
-        const res = await getAPICall("/api/machine-operators");
-        setNewProjectMachines(res || []);
-        const mapping = {};
-        res?.forEach(machine => {
-          if (Array.isArray(machine.operator_id)) {
-            machine.operator_id.forEach(opId => {
-              if (!mapping[opId]) mapping[opId] = [];
-              mapping[opId].push(machine);
-            });
-          }
-        });
-        setNewProjectOperatorMachines(mapping);
-      } catch (err) {
-        console.error("Error fetching machines:", err);
-      }
-    };
+  // Fetches removed as they were for the complex modal
 
-    if (showNewProjectModal) {
-      fetchOperators();
-      fetchMachines();
-    }
-  }, [showNewProjectModal]);
 
   const [isEndReadingMode, setIsEndReadingMode] = useState(false);
 
@@ -291,7 +244,8 @@ const MachineUsageForm = () => {
 
     } catch (err) {
       console.error(err);
-      showToast('danger', 'Failed to add work type');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to add work type';
+      showToast('danger', errorMessage);
     }
   };
 
@@ -627,6 +581,17 @@ const MachineUsageForm = () => {
       console.error("Error fetching pending readings:", err);
       showToast('danger', 'Failed to check project status from the server.');
     }
+  };
+
+  const handleNewCustomerSuccess = (newlyCreatedProject) => {
+    if (newlyCreatedProject) {
+      handleProjectChange(newlyCreatedProject);
+      showToast('success', 'Customer added and selected successfully');
+    } else {
+      showToast('success', 'Customer added successfully, please search to select');
+    }
+    setProjects([]);
+    setShowAddCustomerModal(false);
   };
 
   const handleInputChange = (field, value) => {
@@ -983,7 +948,10 @@ const MachineUsageForm = () => {
                                 color="primary"
                                 size="sm"
                                 className="mt-2"
-                                onClick={() => setShowNewProjectModal(true)}
+                                onClick={() => {
+                                  setInitialCustomerName(searchQuery);
+                                  setShowAddCustomerModal(true);
+                                }}
                               >
                                 Add New Customer
                               </CButton>
@@ -1534,151 +1502,12 @@ const MachineUsageForm = () => {
           </CModalFooter>
         </CModal>
 
-        <CModal
-          visible={showNewProjectModal}
-          onClose={() => setShowNewProjectModal(false)}
-          size="xl"
-          alignment="center"
-        >
-          <CModalHeader>
-            <CModalTitle>Add New Customer</CModalTitle>
-          </CModalHeader>
-          <CModalBody>
-            <CForm id="new-project-form" onSubmit={async (e) => {
-              e.preventDefault();
-              setNewProjectErrors({});
-              setNewProjectLoading(true);
-
-              if (
-                newProjectFormData.end_date &&
-                newProjectFormData.start_date &&
-                new Date(newProjectFormData.end_date) < new Date(newProjectFormData.start_date)
-              ) {
-                setNewProjectErrors({ end_date: "End date must be after or equal to start date." });
-                setNewProjectLoading(false);
-                return;
-              }
-
-              const hasUnassignedMachines = newProjectFormData.operator_id.some((opId, index) => {
-                if (!opId || opId === "") return false;
-                const selectedMachine = newProjectFormData[`machine_${index}`];
-                return !selectedMachine || selectedMachine === "";
-              });
-
-              if (hasUnassignedMachines) {
-                setNewProjectErrors({ general: "Please assign a machine to all selected operators." });
-                setNewProjectLoading(false);
-                return;
-              }
-
-              try {
-                const machineIds = newProjectFormData.operator_id
-                  .map((opId, index) => {
-                    if (opId && opId !== "") {
-                      return newProjectFormData[`machine_${index}`];
-                    }
-                    return null;
-                  })
-                  .filter(id => id !== null);
-
-                const payload = {
-                  ...newProjectFormData,
-                  machine_id: machineIds
-                };
-
-                const response = await post("/api/projects", payload);
-                showToast('success', 'Customer added successfully!');
-                setShowNewProjectModal(false);
-                fetchProjects(searchQuery);
-                handleProjectChange(response);
-                setSearchQuery(response.customer_name);
-                setShowDropdown(false);
-              } catch (error) {
-                console.error("Error creating project:", error);
-                if (error.response?.data.errors) {
-                  setNewProjectErrors(error.response.data.errors);
-                } else {
-                  setNewProjectErrors({
-                    general: error.response?.data?.message || "Failed to create project.",
-                  });
-                }
-              } finally {
-                setNewProjectLoading(false);
-              }
-            }}>
-              <div className="row g-3">
-                {newProjectErrors.general && <CAlert color="danger">{newProjectErrors.general}</CAlert>}
-                <CCol md={4}>
-                  <CFormLabel>Customer Name</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    name="customer_name"
-                    value={newProjectFormData.customer_name}
-                    onChange={(e) => setNewProjectFormData({ ...newProjectFormData, [e.target.name]: e.target.value })}
-                    required
-                    placeholder="Enter Customer Name..."
-                  />
-                </CCol>
-                <CCol md={4}>
-                  <CFormLabel>Customer Mobile Number</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    name="mobile_number"
-                    value={newProjectFormData.mobile_number}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '');
-                      if (value.length <= 10) {
-                        setNewProjectFormData({ ...newProjectFormData, mobile_number: value });
-                      }
-                    }}
-                    required
-                    placeholder="Enter Customer Mobile..."
-                  />
-                </CCol>
-                <CCol md={4}>
-                  <CFormLabel>GST number</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    name="gst_number"
-                    value={newProjectFormData.gst_number}
-                    onChange={(e) => setNewProjectFormData({ ...newProjectFormData, [e.target.name]: e.target.value })}
-                    placeholder="Enter GST number..."
-                    maxLength={15}
-                  />
-                </CCol>
-                {/* <CCol md={4}>
-                  <CFormLabel>Project Name</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    name="project_name"
-                    value={newProjectFormData.project_name}
-                    onChange={(e) => setNewProjectFormData({ ...newProjectFormData, [e.target.name]: e.target.value })}
-                    placeholder="Enter Project Name..."
-                  />
-                </CCol> */}
-                <CCol md={4}>
-                  <CFormLabel>Location</CFormLabel>
-                  <CFormInput
-                    type="text"
-                    name="work_place"
-                    value={newProjectFormData.work_place}
-                    onChange={(e) => setNewProjectFormData({ ...newProjectFormData, [e.target.name]: e.target.value })}
-                    placeholder="Enter Your Location..."
-                  />
-                </CCol>
-
-              </div>
-            </CForm>
-          </CModalBody>
-          <CModalFooter>
-            <CButton color="secondary" onClick={() => setShowNewProjectModal(false)}>
-              Cancel
-            </CButton>
-            <CButton type="submit" form="new-project-form" color="primary" disabled={newProjectLoading}>
-              {newProjectLoading ? "Submitting..." : "Add Customer"}
-            </CButton>
-          </CModalFooter>
-        </CModal>
+        <NewCustomerModal
+          visible={showAddCustomerModal}
+          onClose={() => setShowAddCustomerModal(false)}
+          onSuccess={handleNewCustomerSuccess}
+          initialName={initialCustomerName}
+        />
       </div>
     </div>
   );

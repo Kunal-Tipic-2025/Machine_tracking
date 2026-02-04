@@ -27,6 +27,7 @@ import {
 } from '@coreui/react';
 import { getAPICall, post, postFormData } from '../../../util/api';
 import { useNavigate } from 'react-router-dom';
+import ExpenseTypeModal from './ExpenseTypeModal';
 import { useToast } from '../../common/toast/ToastContext';
 import { useTranslation } from 'react-i18next';
 import Select from "react-select";
@@ -46,6 +47,7 @@ const NewExpense = () => {
   const [machines, setMachines] = useState([]);
   const [projects, setProjects] = useState([]); // Added projects state
   const [users, setUsers] = useState([]);
+  const [showExpenseTypeModal, setShowExpenseTypeModal] = useState(false); // New modal state
   // console.log(customerName);
 
   const [operators, setOperators] = useState([]);
@@ -679,7 +681,7 @@ const NewExpense = () => {
                 <CButton
                   color="danger"
                   size="sm"
-                  onClick={() => window.location.href = "/#/expense/new-type"}
+                  onClick={() => setShowExpenseTypeModal(true)}
                 >
                   {t("LABELS.new_expense_type")}
                 </CButton>
@@ -733,7 +735,7 @@ const NewExpense = () => {
                   </div> */}
 
 
-                  <div className="col-sm-4">
+                  <div className="col-sm-3">
                     <div className="">
                       <CFormLabel htmlFor="expense_id"><b>{t("LABELS.expense_type")}</b></CFormLabel>
                       {/* <CFormSelect
@@ -781,13 +783,13 @@ const NewExpense = () => {
                           const isOperator = category.includes('operator') || category.includes('helper') || category.includes('driver');
 
                           // Check if Machine Dropdown should be shown
-                          // User request: Show machine for Machine, Operator/Helper, Capital, and Operational expenses.
+                          // User request: Show machine only for Machine and Operator/Helper expenses.
+                          // Hidden for Capital, Operational, etc.
                           const isMachineRelated =
                             category.includes('machine') ||
                             category.includes('operator') ||
                             category.includes('helper') ||
-                            category.includes('capital') ||
-                            category.includes('operational');
+                            category.includes('driver');
 
                           setIsOperatorExpense(isOperator);
 
@@ -817,56 +819,11 @@ const NewExpense = () => {
                     </div>
                   </div>
 
-                  {state.open && (
-                    <div className="col-sm-4">
-                      <div className="">
-                        <CFormLabel htmlFor="machine_id">
-                          <b>{t("LABELS.machine")}</b>
-                        </CFormLabel>
-                        <Select
-                          id="machine_id"
-                          name="machine_id"
-                          value={
-                            machines
-                              .map(m => ({ value: m.id, label: m.machine_name }))
-                              .find(opt => String(opt.value) === String(state.machine_id)) || null
-                          }
-                          onChange={(selectedOption) =>
-                            setState(prev => ({
-                              ...prev,
-                              machine_id: selectedOption ? selectedOption.value : ""
-                            }))
-                          }
-                          options={machines.map(m => ({
-                            value: m.id,
-                            label: m.machine_name
-                          }))}
-                          placeholder="Select Machine"
-                          isClearable
-                          isSearchable
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderRadius: "0.5rem",
-                              borderColor: "#ced4da",
-                              minHeight: "38px",
-                            }),
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Only show Operator or Customer column if:
-                      1. It IS an operator expense (Show Operator dropdown)
-                      OR 
-                      2. It is NOT a machine/diesel expense (Show Customer dropdown)
-                      
-                      If it IS a machine/diesel expense (state.open=true) and NOT operator, 
-                      we hide this column entirely as per user request (only select machine).
+                  {/* Only show Operator column if it IS an operator expense. 
+                      Customer dropdown is removed for all categories.
                   */}
-                  {(state.expense_id) && (
-                    <div className="col-sm-4">
+                  {(isOperatorExpense) && (
+                    <div className="col-sm-3">
                       {isOperatorExpense ? (
                         <>
                           <CFormLabel><b>{t("LABELS.operator_helper_name")}</b></CFormLabel>
@@ -933,22 +890,48 @@ const NewExpense = () => {
                     </div>
                   )}
 
-
-                  <div className="col-sm-4">
-                    <div className="mb-3">
-                      <CFormLabel htmlFor="name"><b>{t("LABELS.about_expense")}</b></CFormLabel>
-                      <CFormInput
-                        type="text"
-                        id="desc"
-                        placeholder={t("LABELS.enter_expense_description")}
-                        name="desc"
-                        value={state.desc}
-                        onChange={handleChange}
-                      // required
-                      />
+                  {state.open && (
+                    <div className="col-sm-3">
+                      <div className="">
+                        <CFormLabel htmlFor="machine_id">
+                          <b>{t("LABELS.machine")}</b>
+                        </CFormLabel>
+                        <Select
+                          id="machine_id"
+                          name="machine_id"
+                          value={
+                            machines
+                              .map(m => ({ value: m.id, label: m.machine_name }))
+                              .find(opt => String(opt.value) === String(state.machine_id)) || null
+                          }
+                          onChange={(selectedOption) =>
+                            setState(prev => ({
+                              ...prev,
+                              machine_id: selectedOption ? selectedOption.value : ""
+                            }))
+                          }
+                          options={machines.map(m => ({
+                            value: m.id,
+                            label: m.machine_name
+                          }))}
+                          placeholder="Select Machine"
+                          isClearable
+                          isSearchable
+                          styles={{
+                            control: (base) => ({
+                              ...base,
+                              borderRadius: "0.5rem",
+                              borderColor: "#ced4da",
+                              minHeight: "38px",
+                            }),
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="col-sm-4">
+                  )}
+
+
+                  <div className="col-sm-3">
                     <div className="mb-3">
                       <CFormLabel htmlFor="expense_date"><b>{t("LABELS.expense_date")}</b></CFormLabel>
                       <CFormInput
@@ -963,63 +946,77 @@ const NewExpense = () => {
                       />
                     </div>
                   </div>
-                </div>
 
-                {!isOperatorExpense && (<div className="row align-items-end">
-                  <div className="col-sm-4">
+                  <div className="col-sm-3">
                     <div className="mb-3">
-                      <CFormLabel htmlFor="price">
-                        <b>{t("LABELS.price_per_unit")}</b>
-                      </CFormLabel>
+                      <CFormLabel htmlFor="name"><b>{t("LABELS.about_expense")}</b></CFormLabel>
                       <CFormInput
-                        type="number"
-                        min="0"
-                        id="price"
-                        onWheel={(e) => e.target.blur()}
-                        placeholder="0.00"
-                        step="0.01"
-                        name="price"
-                        onFocus={() => setState(prev => ({ ...prev, price: '' }))}
-                        value={state.price}
+                        type="text"
+                        id="desc"
+                        placeholder={t("LABELS.enter_expense_description")}
+                        name="desc"
+                        value={state.desc}
                         onChange={handleChange}
-                        required
-                        feedbackInvalid={t("MSG.price_validation")}
+                      // required
                       />
                     </div>
                   </div>
 
-                  <div className="col-sm-4">
-                    <div className="mb-3">
-                      <CFormLabel htmlFor="qty">
-                        <b>{t("LABELS.total_units")}</b>
-                      </CFormLabel>
-                      <CFormInput
-                        type="number"
-                        id="qty"
-                        step="0.01"
-                        min="0"
-                        placeholder=" "
-                        name="qty"
-                        value={state.qty}
-                        onWheel={(e) => e.target.blur()}
-                        onKeyDown={(e) => {
-                          if (['e', '+', '-', ','].includes(e.key)) {
-                            e.preventDefault();
-                          }
-                        }}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === '' || /^\d+(\.\d{0,2})?$/.test(value)) {
-                            handleChange(e)
-                          }
-                        }}
-                        required
-                        feedbackInvalid={t("MSG.quantity_validation")}
-                      />
+                  {!isOperatorExpense && (<>
+                    <div className="col-sm-3">
+                      <div className="mb-3">
+                        <CFormLabel htmlFor="price">
+                          <b>{t("LABELS.price_per_unit")}</b>
+                        </CFormLabel>
+                        <CFormInput
+                          type="number"
+                          min="0"
+                          id="price"
+                          onWheel={(e) => e.target.blur()}
+                          placeholder="0.00"
+                          step="0.01"
+                          name="price"
+                          onFocus={() => setState(prev => ({ ...prev, price: '' }))}
+                          value={state.price}
+                          onChange={handleChange}
+                          required
+                          feedbackInvalid={t("MSG.price_validation")}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* <div className="col-sm-3">
+                    <div className="col-sm-3">
+                      <div className="mb-3">
+                        <CFormLabel htmlFor="qty">
+                          <b>{t("LABELS.total_units")}</b>
+                        </CFormLabel>
+                        <CFormInput
+                          type="number"
+                          id="qty"
+                          step="0.01"
+                          min="0"
+                          placeholder=" "
+                          name="qty"
+                          value={state.qty}
+                          onWheel={(e) => e.target.blur()}
+                          onKeyDown={(e) => {
+                            if (['e', '+', '-', ','].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            if (value === '' || /^\d+(\.\d{0,2})?$/.test(value)) {
+                              handleChange(e)
+                            }
+                          }}
+                          required
+                          feedbackInvalid={t("MSG.quantity_validation")}
+                        />
+                      </div>
+                    </div>
+
+                    {/* <div className="col-sm-3">
                     <div className="mb-3">
                       <CFormCheck
                         id="isGst"
@@ -1036,41 +1033,41 @@ const NewExpense = () => {
                     </div>
                   </div> */}
 
-                  <div className="col-sm-4">
-                    <div className="mb-3">
-                      <CFormLabel htmlFor="total_price">
-                        <b>{t("LABELS.total_price")}</b>
-                      </CFormLabel>
+                    <div className="col-sm-3">
+                      <div className="mb-3">
+                        <CFormLabel htmlFor="total_price">
+                          <b>{t("LABELS.total_price")}</b>
+                        </CFormLabel>
+                        <CFormInput
+                          type="number"
+                          min="0"
+                          onWheel={(e) => e.target.blur()}
+                          id="total_price"
+                          placeholder=""
+                          name="total_price"
+                          value={state.total_price}
+                          onChange={handleChange}
+                          readOnly
+                        />
+                      </div>
+                    </div>
+                  </>)}
+
+                  {isOperatorExpense && (
+                    <div className="col-sm-3">
+                      <CFormLabel><b>Total Amount</b></CFormLabel>
                       <CFormInput
                         type="number"
-                        min="0"
-                        onWheel={(e) => e.target.blur()}
-                        id="total_price"
-                        placeholder=""
-                        name="total_price"
                         value={state.total_price}
-                        onChange={handleChange}
-                        readOnly
+                        onFocus={() => setState(prev => ({ ...prev, total_price: '' }))}
+                        onChange={(e) =>
+                          setState(prev => ({ ...prev, total_price: e.target.value }))
+                        }
+                        required
                       />
                     </div>
-                  </div>
-                </div>)}
-
-                {isOperatorExpense && (
-                  <div className="col-sm-4">
-                    <CFormLabel><b>Total Amount</b></CFormLabel>
-                    <CFormInput
-                      type="number"
-                      value={state.total_price}
-                      onFocus={() => setState(prev => ({ ...prev, total_price: '' }))}
-                      onChange={(e) =>
-                        setState(prev => ({ ...prev, total_price: e.target.value }))
-                      }
-                      required
-                    />
-                  </div>
-                )}
-
+                  )}
+                </div>
 
                 <div className="row">
                   {/* <div className="col-sm-3">
@@ -1311,6 +1308,13 @@ const NewExpense = () => {
           </CButton>
         </CModalFooter>
       </CModal>
+
+      {/* Expense Type Modal */}
+      <ExpenseTypeModal
+        visible={showExpenseTypeModal}
+        onClose={() => setShowExpenseTypeModal(false)}
+        onSuccess={() => fetchExpenseTypes()}
+      />
     </>
   );
 };

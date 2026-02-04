@@ -107,7 +107,7 @@ const ChargeTypeModal = ({ visible, onClose, onSuccess, initialData = null }) =>
                             placeholder="e.g. विलंब शुल्क"
                         />
                     </div>
-                    <div className="mb-3">
+                    {/* <div className="mb-3">
                         <CFormCheck
                             id="amountDeductCheck"
                             name="amount_deduct"
@@ -118,7 +118,7 @@ const ChargeTypeModal = ({ visible, onClose, onSuccess, initialData = null }) =>
                         <small className="text-muted">
                             Checked = Subtracts from Total. Unchecked = Adds to Total.
                         </small>
-                    </div>
+                    </div> */}
                     <div className="mb-3">
                         <CFormCheck
                             id="showCheck"
