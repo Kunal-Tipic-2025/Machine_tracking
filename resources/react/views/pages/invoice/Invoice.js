@@ -22,7 +22,7 @@ import {
   CModalBody,
   CModalFooter,
 } from '@coreui/react'
-import { cilArrowLeft, cilCart, cilChevronBottom, cilList, cilSearch, cilX } from '@coreui/icons'
+import { cilArrowLeft, cilCart, cilChevronBottom, cilList, cilSearch, cilX, cilCheckCircle, cilLocationPin } from '@coreui/icons'
 import CIcon from '@coreui/icons-react'
 import { getAPICall, post, put } from '../../../util/api'
 import { useNavigate } from 'react-router-dom'
@@ -1004,15 +1004,17 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                     )}
                   </div>
                   {form.customer_name && (
-                    <div className="mt-1 p-2 bg-light rounded border">
-                      <div className="small text-success">
-                        <strong>Selected:</strong> {form.customer_name}
+                    <div className="mt-1">
+                      <div className="small text-success d-flex align-items-center flex-wrap">
+                        <span className="me-2">
+                          <strong><CIcon icon={cilCheckCircle} size="sm" className="me-1" />Selected:</strong> {form.customer_name}
+                        </span>
+                        {form.customer.address && (
+                          <span className="text-muted ms-auto ms-md-2" style={{ fontSize: '0.85em' }}>
+                            <CIcon icon={cilLocationPin} size="sm" className="me-1" />{form.customer.address}
+                          </span>
+                        )}
                       </div>
-                      {form.customer.address && (
-                        <div className="small text-muted">
-                          <strong>Location:</strong> {form.customer.address}
-                        </div>
-                      )}
                     </div>
                   )}
                 </CCol>
@@ -1038,25 +1040,29 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                     </span>
                   </h6> */}
 
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h6 className="fw-semibold mb-0">
-                      Project Logs (Total: {filteredLogs.length}) |
-                      <span className="text-primary ms-2">
+                  <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+                    <div className="fw-semibold mb-0 d-flex flex-wrap align-items-center gap-2">
+                      <span className="text-nowrap">
+                        Project Logs (Total: {filteredLogs.length})
+                      </span>
+                      <span className="d-none d-md-inline text-muted">|</span>
+                      <span className="text-primary text-nowrap">
                         Showing: {searchFilteredLogs.length}
-                      </span> |
-                      <span className="text-success ms-2">
+                      </span>
+                      <span className="d-none d-md-inline text-muted">|</span>
+                      <span className="text-success text-nowrap">
                         Selected: {selectedLogIds.length}
                       </span>
-                    </h6>
+                    </div>
 
-                    <div style={{ width: '300px' }}>
+                    <div className="w-100" style={{ maxWidth: '300px' }}>
                       <CInputGroup size="sm">
                         <CInputGroupText>
                           <CIcon icon={cilSearch} />
                         </CInputGroupText>
                         <CFormInput
                           type="text"
-                          placeholder="Search by operator, work type, machine, mode..."
+                          placeholder="Search..."
                           value={logSearchQuery}
                           onChange={(e) => setLogSearchQuery(e.target.value)}
                         />
@@ -1072,25 +1078,19 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                       </CInputGroup>
                     </div>
                   </div>
-                  <div
-                    className="table-container"
+                  <div className="d-none d-md-block table-responsive"
                     style={{
-                      width: '100%',
-                      overflowX: 'auto',
-                      overflowY: 'auto',
                       border: '1px solid #dee2e6',
                       borderRadius: '8px',
                       backgroundColor: '#fff',
-                      WebkitOverflowScrolling: 'touch', // Smooth iOS scrolling
                     }}
                   >
                     <table
-                      className="table table-bordered align-middle"
+                      className="table table-bordered align-middle mb-0"
                       style={{
-                        minWidth: '1200px', // Ensure enough width for horizontal scroll
+                        minWidth: '1200px',
                         width: '100%',
-                        tableLayout: 'fixed', // Keep for performance
-                        margin: 0,
+                        tableLayout: 'fixed',
                       }}
                     >
                       <thead
@@ -1104,14 +1104,6 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                       >
                         <tr>
                           <th style={{ width: '50px' }} className="text-center align-middle">
-                            {/* <input
-                              type="checkbox"
-                              checked={selectedLogIds.length === filteredLogs.length && selectedLogIds.length > 0}
-                              onChange={(e) => {
-                                const isChecked = e.target.checked
-                                setSelectedLogIds(isChecked ? filteredLogs.map((l) => l.id) : [])
-                              }}
-                            /> */}
                             <input
                               type="checkbox"
                               checked={
@@ -1165,18 +1157,19 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
                           return (
                             <tr key={idx}>
-                              <td className="text-center align-middle">
+                              <td className="text-center align-middle" data-label="Select">
                                 <input
                                   type="checkbox"
                                   checked={selectedLogIds.includes(l.id)}
                                   onChange={() => handleLogSelection(l.id)}
                                 />
                               </td>
-                              <td className="text-center small">{workDate || 'N/A'}</td>
+                              <td className="text-center small" data-label="Date">{workDate || 'N/A'}</td>
                               <td
                                 className="text-truncate small"
                                 style={{ maxWidth: '110px' }}
                                 title={getMachineName(l.machine_id)}
+                                data-label="Machine"
                               >
                                 {getMachineName(l.machine_id)}
                               </td>
@@ -1184,18 +1177,19 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                                 className="text-truncate small"
                                 style={{ maxWidth: '100px' }}
                                 title={operatorDisplay.name}
+                                data-label="Operator"
                               >
                                 {operatorDisplay.name}
                               </td>
-                              <td>
+                              <td data-label="Work Type">
                                 {workTypeMap[l.work_type_id] || '-'}
                               </td>
 
-                              <td className="text-center">{start}</td>
-                              <td className="text-center">{end}</td>
-                              <td className="text-center">{total}</td>
-                              <td className="text-center small">{modeName}</td>
-                              <td>
+                              <td className="text-center" data-label="Start">{start}</td>
+                              <td className="text-center" data-label="End">{end}</td>
+                              <td className="text-center" data-label="Net">{total}</td>
+                              <td className="text-center small" data-label="Mode">{modeName}</td>
+                              <td data-label="Price/Hr">
                                 {String(l.id) === String(editingLogRowId) ? (
                                   <input
                                     type="number"
@@ -1210,8 +1204,8 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                                   <div className="text-center small">₹{price_per_hour}</div>
                                 )}
                               </td>
-                              <td className="text-center small">₹{totalprice.toFixed(2)}</td>
-                              <td className="text-center">
+                              <td className="text-center small" data-label="Total">₹{totalprice.toFixed(2)}</td>
+                              <td className="text-center" data-label="Action">
                                 {String(l.id) === String(editingLogRowId) ? (
                                   <>
                                     <CButton size="sm" color="success" className="me-1" onClick={() => saveEditLogPrice(l)}>
@@ -1231,7 +1225,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                           )
                         })}
 
-                        {/* Grand Total Row */}
+                        {/* Desktop Grand Total Row */}
                         {selectedLogIds.length > 0 && (() => {
                           // const totalNetReading = filteredLogs
                           const totalNetReading = searchFilteredLogs
@@ -1262,19 +1256,192 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
 
                           return (
                             <tr className="fw-bold table-success">
-                              <td className="text-center align-middle">{selectedLogIds.length}</td>
-                              <td colSpan="6" className="text-end pe-3">
+                              <td className="text-center align-middle" data-label="Total Count">{selectedLogIds.length}</td>
+                              <td colSpan="6" className="text-end pe-3 d-none d-md-table-cell">
                                 Grand Total:
                               </td>
-                              <td className="text-center">{totalNetReading.toFixed(2)}</td>
+                              {/* Mobile View Label for Total */}
+                              <td className="d-md-none" data-label="Grand Total Label">Grand Total:</td>
+
+                              <td className="text-center" data-label="Total Net">{totalNetReading.toFixed(2)}</td>
                               <td></td>
-                              <td className="text-center">₹{totalAmount.toFixed(2)}</td>
+                              <td className="text-center" data-label="Grand Total Amount">₹{totalAmount.toFixed(2)}</td>
                               <td></td>
                             </tr>
                           )
                         })()}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* 📱 Mobile Card View */}
+                  <div className="d-md-none">
+                    {/* Select All Checkbox for Mobile */}
+                    <div className="d-flex align-items-center mb-2 p-2 bg-light rounded shadow-sm border">
+                      <input
+                        type="checkbox"
+                        className="form-check-input me-2"
+                        id="selectAllMobile"
+                        checked={
+                          searchFilteredLogs.length > 0 &&
+                          searchFilteredLogs.every((l) => selectedLogIds.includes(l.id))
+                        }
+                        onChange={(e) => {
+                          const isChecked = e.target.checked
+                          setSelectedLogIds(
+                            isChecked
+                              ? [...new Set([...selectedLogIds, ...searchFilteredLogs.map((l) => l.id)])]
+                              : selectedLogIds.filter((id) => !searchFilteredLogs.map((l) => l.id).includes(id))
+                          )
+                        }}
+                      />
+                      <label htmlFor="selectAllMobile" className="fw-semibold text-secondary mb-0">Select All Logs</label>
+                    </div>
+
+                    {searchFilteredLogs.map((l, idx) => {
+                      const start = Number(l.machine_start ?? l.start_reading ?? 0) || 0
+                      const end = Number(l.machine_end ?? l.end_reading ?? 0) || 0
+                      const total =
+                        l.actual_machine_hr != null && !isNaN(Number(l.actual_machine_hr))
+                          ? Number(l.actual_machine_hr)
+                          : Math.max(0, end - start)
+                      const workDate = String(l.work_date).slice(0, 10).split('-').reverse().join('-')
+                      const operatorDisplay = operators.find((ele) => ele.id == l.operator_id) || { name: 'N/A' }
+                      const price_per_hour =
+                        String(l.id) === String(editingLogRowId) ? Number(editingLogPrice || 0) : Number(l.price_per_hour || 0)
+                      const totalprice = total * price_per_hour
+                      const modeMatch = prices.find((p) => p.id === Number(l.mode_id))
+                      const modeName = modeMatch ? modeMatch.mode : 'N/A'
+                      const isSelected = selectedLogIds.includes(l.id)
+
+                      return (
+                        <CCard key={idx} className={`mb-3 shadow-sm border ${isSelected ? 'border-primary' : ''}`} style={{ backgroundColor: isSelected ? '#f8f9ff' : '#fff' }}>
+                          <CCardBody className="p-3">
+                            {/* Header: Checkbox + Date + Price Edit Button */}
+                            <div className="d-flex justify-content-between align-items-start mb-2 border-bottom pb-2">
+                              <div className="d-flex align-items-center">
+                                <input
+                                  type="checkbox"
+                                  className="form-check-input me-2"
+                                  style={{ width: '1.2em', height: '1.2em' }}
+                                  checked={isSelected}
+                                  onChange={() => handleLogSelection(l.id)}
+                                />
+                                <h6 className="mb-0 fw-bold">{workDate || 'N/A'}</h6>
+                              </div>
+                              <div className="text-end">
+                                {String(l.id) === String(editingLogRowId) ? (
+                                  <div className="d-flex gap-1">
+                                    <CButton size="sm" color="success" className="p-1 px-2 text-white" onClick={() => saveEditLogPrice(l)}>
+                                      ✓
+                                    </CButton>
+                                    <CButton size="sm" color="secondary" variant="outline" className="p-1 px-2" onClick={cancelEditLogPrice}>
+                                      ✕
+                                    </CButton>
+                                  </div>
+                                ) : (
+                                  <CButton size="sm" color="light" className="text-primary p-1 px-2" onClick={() => startEditLogPrice(l)}>
+                                    <span className="small fw-bold">Edit Price</span>
+                                  </CButton>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Details Grid */}
+                            <div className="row g-2 text-dark">
+                              <div className="col-12">
+                                <span className="text-secondary small d-block">Machine</span>
+                                <span className="fw-medium">{getMachineName(l.machine_id)}</span>
+                              </div>
+                              <div className="col-6">
+                                <span className="text-secondary small d-block">Operator</span>
+                                <span className="fw-medium">{operatorDisplay.name}</span>
+                              </div>
+                              <div className="col-6 text-end">
+                                <span className="text-secondary small d-block">Work Type</span>
+                                <span className="fw-medium">{workTypeMap[l.work_type_id] || '-'}</span>
+                              </div>
+
+                              <div className="col-12 border-top my-1"></div>
+
+                              <div className="col-4 text-center">
+                                <span className="text-secondary small d-block">Start</span>
+                                <span className="fw-bold">{start}</span>
+                              </div>
+                              <div className="col-4 text-center border-start border-end">
+                                <span className="text-secondary small d-block">End</span>
+                                <span className="fw-bold">{end}</span>
+                              </div>
+                              <div className="col-4 text-center">
+                                <span className="text-secondary small d-block">Net Hr</span>
+                                <span className="fw-bold text-success">{total}</span>
+                              </div>
+
+                              <div className="col-12 border-top my-1"></div>
+
+                              <div className="col-6">
+                                <span className="text-secondary small d-block">Rate / Hr</span>
+                                {String(l.id) === String(editingLogRowId) ? (
+                                  <input
+                                    type="number"
+                                    value={editingLogPrice}
+                                    min={0}
+                                    step="0.01"
+                                    onChange={(e) => setEditingLogPrice(e.target.value)}
+                                    className="form-control form-control-sm"
+                                  />
+                                ) : (
+                                  <span className="fw-bold">₹{price_per_hour}</span>
+                                )}
+                              </div>
+                              <div className="col-6 text-end">
+                                <span className="text-secondary small d-block">Total Price</span>
+                                <h5 className="mb-0 fw-bold text-primary">₹{totalprice.toFixed(2)}</h5>
+                              </div>
+                            </div>
+                          </CCardBody>
+                        </CCard>
+                      )
+                    })}
+
+                    {/* Mobile Grand Total Card */}
+                    {selectedLogIds.length > 0 && (() => {
+                      const totalNetReading = searchFilteredLogs
+                        .filter((l) => selectedLogIds.includes(l.id))
+                        .reduce((acc, l) => {
+                          const start = Number(l.machine_start ?? l.start_reading ?? 0) || 0;
+                          const end = Number(l.machine_end ?? l.end_reading ?? 0) || 0;
+                          const total = l.actual_machine_hr != null && !isNaN(Number(l.actual_machine_hr))
+                            ? Number(l.actual_machine_hr)
+                            : Math.max(0, end - start);
+                          return acc + total;
+                        }, 0);
+
+                      const totalAmount = searchFilteredLogs
+                        .filter((l) => selectedLogIds.includes(l.id))
+                        .reduce((acc, l) => {
+                          const start = Number(l.machine_start ?? l.start_reading ?? 0) || 0;
+                          const end = Number(l.machine_end ?? l.end_reading ?? 0) || 0;
+                          const total = l.actual_machine_hr != null && !isNaN(Number(l.actual_machine_hr))
+                            ? Number(l.actual_machine_hr)
+                            : Math.max(0, end - start);
+                          const price = Number(l.price_per_hour) || 0;
+                          return acc + (total * price);
+                        }, 0);
+
+                      return (
+                        <div className="position-sticky bottom-0 bg-white p-3 border-top shadow-lg rounded-top" style={{ zIndex: 1050 }}>
+                          <div className="d-flex justify-content-between align-items-center mb-1">
+                            <span className="text-secondary fw-semibold">Selected Logs ({selectedLogIds.length})</span>
+                            <span className="badge bg-success">{totalNetReading.toFixed(2)} Hrs</span>
+                          </div>
+                          <div className="d-flex justify-content-between align-items-center">
+                            <h5 className="mb-0 fw-bold">Grand Total</h5>
+                            <h4 className="mb-0 fw-bold text-primary">₹{totalAmount.toFixed(2)}</h4>
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               )}
@@ -1288,7 +1455,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                   {additionalCharges.map((item, index) => (
                     <CRow className="align-items-end mb-3" key={index} style={{ zIndex: 1000 - index, position: 'relative' }}>
                       {/* Charge Type Searchable Dropdown */}
-                      <CCol md={3}>
+                      <CCol xs={12} md={3} className="mb-2 mb-md-0">
                         <CFormLabel>Charge Type</CFormLabel>
                         <div style={{ position: 'relative' }}>
                           <CFormInput
@@ -1356,7 +1523,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                       </CCol>
 
                       {/* Amount */}
-                      <CCol md={2}>
+                      <CCol xs={6} md={2} className="mb-2 mb-md-0">
                         <CFormLabel>Amount</CFormLabel>
                         <CFormInput
                           type="number"
@@ -1368,11 +1535,12 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                         />
                       </CCol>
 
-                      <CCol> <CButton size="sm" color="primary" variant="outline" onClick={addAdditionalCharge}>
-                        + Add Additional Charge
-                      </CButton></CCol>
+                      <CCol xs={6} md="auto" className="mb-2 mb-md-0">
+                        <CButton size="sm" color="primary" variant="outline" onClick={addAdditionalCharge} className="w-100 w-md-auto">
+                          + Add
+                        </CButton></CCol>
                       {/* Remove */}
-                      <CCol md={1}>
+                      <CCol xs={12} md={1} className="text-end text-md-start">
                         {additionalCharges.length > 1 && (
                           <CButton
                             color="danger"
@@ -1393,10 +1561,10 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                 {additionalCharges.some(charge => charge.charge_type && charge.amount) && (
                   <CCardBody className="border-top bg-light">
                     <CRow className="align-items-center">
-                      <CCol md={9} className="text-end">
+                      <CCol xs={6} md={9} className="text-end">
                         <h6 className="mb-0 fw-bold">Additional Charges Net:</h6>
                       </CCol>
-                      <CCol md={3}>
+                      <CCol xs={6} md={3} className="text-end text-md-start">
                         <h5 className="mb-0 fw-bold text-primary">
                           ₹{additionalCharges
                             .filter(charge => charge.charge_type && charge.amount)

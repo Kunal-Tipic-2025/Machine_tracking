@@ -1,5 +1,3 @@
-
-
 .suggestions-list {
   position: absolute;
   z-index: 1000;
@@ -8,23 +6,28 @@
   border-radius: 5px;
   list-style-type: none;
   padding: 0;
-  margin-top: 2px; /* small gap below input */
+  margin-top: 2px;
+  /* small gap below input */
   max-height: 400px;
   overflow-y: auto;
-  width: 97%; /* match input width */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* optional */
+  width: 97%;
+  /* match input width */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  /* optional */
 }
+
 .suggestions-list li {
   padding: 8px 12px;
   cursor: pointer;
 }
+
 .suggestions-list li:hover {
   background-color: #f0f0f0;
 }
 
 
-.bottom-border{
-    border-bottom: 1px solid #dee2e6;
+.bottom-border {
+  border-bottom: 1px solid #dee2e6;
 }
 
 /* Product suggestions list styling */
@@ -33,7 +36,7 @@
   z-index: 1000;
   background-color: white;
   border: 1px solid #ddd;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   max-height: 200px;
   overflow-y: auto;
   width: 100%;
@@ -41,6 +44,7 @@
   list-style-type: none;
   padding: 0;
   margin: 0;
+  left: 0;
 }
 
 .product-suggestions-list li {
@@ -57,4 +61,33 @@
   font-weight: bold;
   background-color: rgba(255, 255, 0, 0.3);
 }
-  
+
+/* 📱 Mobile Responsive Table View */
+@media screen and (max-width: 768px) {
+  .table-container {
+    border: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+
+  .table-container table {
+    display: block;
+    min-width: 100% !important;
+    border: none !important;
+  }
+
+  .table-container thead {
+    display: none;
+    /* Hide header on mobile */
+  }
+
+  .table-container tbody {
+    display: block;
+  }
+
+  .table-container tr {
+    display: block;
+    margin-bottom: 1rem;
+    background: #fff;
+  }
+}
