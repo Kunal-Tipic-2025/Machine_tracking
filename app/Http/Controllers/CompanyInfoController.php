@@ -157,56 +157,56 @@ private function createDefaultExpenseTypes($companyId, $createdBy)
     [
         'name' => 'Diesel Expenses',
         'localName' => 'डिझेल खर्च',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Other Expense',
         'desc' => 'Diesel related expenses',
         'show' => 1
     ],
     [
         'name' => 'Operator Expenses',
         'localName' => 'ऑपरेटर खर्च',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Operator Expense',
         'desc' => 'Expenses related to operator work',
         'show' => 1
     ],
     [
         'name' => 'Operator Salary',
         'localName' => 'ऑपरेटर पगार',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Operator Expense',
         'desc' => 'Monthly operator salary',
         'show' => 1
     ],
     [
         'name' => 'Advance Salary',
         'localName' => 'अॅडव्हान्स पगार',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Operator Expense',
         'desc' => 'Advance given on salary',
         'show' => 1
     ],
     [
         'name' => 'Blasting Expense',
         'localName' => 'ब्लास्टिंग खर्च',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Other Expense',
         'desc' => 'Blasting related expenses',
         'show' => 1
     ],
     [
         'name' => 'Machine Maintenance',
         'localName' => 'मशीन देखभाल',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Machine Expense',
         'desc' => 'Machine maintenance and repairs',
         'show' => 1
     ],
     [
         'name' => 'Machine Servicing',
         'localName' => 'मशीन सर्व्हिसिंग',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Machine Expense',
         'desc' => 'Machine servicing costs',
         'show' => 1
     ],
     [
         'name' => 'Other',
         'localName' => 'इतर खर्च',
-        'expense_category' => 'Operational Expense',
+        'expense_category' => 'Other Expense',
         'desc' => 'Miscellaneous expenses',
                'show' => 1
     ]

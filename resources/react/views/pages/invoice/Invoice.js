@@ -825,7 +825,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
             lastNavigationId = resp.id
             if (validAdditionalCharges.length > 0) {
               await post('/api/invoice-additional-charges/bulk', {
-                invoice_id: String(resp.invoice_number),
+                invoice_id: String(resp.id), // ✅ Changed to ID
                 company_id: companyID,
                 charges: validAdditionalCharges,
               });

@@ -420,6 +420,7 @@ const PaymentPage = () => {
 
 
     const handleSave = async () => {
+        if (!response) return;
 
         const logsTotal = response?.total || 0;
         const paymentEntered = Number(formData.amountPaid || 0);
@@ -435,7 +436,7 @@ const PaymentPage = () => {
                 payment_mode: formData.paymentMode?.trim() || 'Cash',
             };
 
-            const response = await fetch(`/api/project-payments/${id}/status`, {
+            const statusRes = await fetch(`/api/project-payments/${id}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -443,11 +444,11 @@ const PaymentPage = () => {
                 body: JSON.stringify(updatedData)
             });
 
-            if (!response.ok) {
+            if (!statusRes.ok) {
                 throw new Error('Failed to update payment');
             }
 
-            const result = await response.json();
+            const result = await statusRes.json();
             console.log('Payment updated:', result);
             setsave(true);
             setIsShow(false);
@@ -460,7 +461,7 @@ const PaymentPage = () => {
 
         const today = new Date().toISOString().split('T')[0];
         const payload = {
-            company_id: response.company_id,
+            company_id: response?.company_id,
             project_id: response.project?.id,
             invoice_id: response?.invoice_number,
             payment: paidForLogs,
@@ -508,7 +509,7 @@ const PaymentPage = () => {
                 //     }),
                 // });
                 const data = {
-                    invoice_id: response.invoice_number,
+                    invoice_id: response?.invoice_number,
                     payable_amount: leftoverForExtras
                 }
                 await post('/api/invoice-additional-charges/auto-settle', data);
@@ -846,7 +847,7 @@ const PaymentPage = () => {
                 <div className="card-header">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h5 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600' }}>
-                            Invoice #{response.invoice_number}
+                            Invoice #{response?.invoice_number}
                         </h5>
                     </div>
                 </div>
@@ -866,24 +867,24 @@ const PaymentPage = () => {
                             {/* === Customer Info === */}
                             <div style={{ margin: 0 }}>
                                 <p style={{ margin: '0 0 0.35rem' }}>
-                                    <strong>Customer Name:</strong> {response.project?.customer_name}
+                                    <strong>Customer Name:</strong> {response?.project?.customer_name}
                                 </p>
                                 <p style={{ margin: '0 0 0.35rem' }}>
-                                    <strong>Customer Address:</strong> {response.project?.work_place}
+                                    <strong>Customer Address:</strong> {response?.project?.work_place}
                                 </p>
                                 <p style={{ margin: 0 }}>
-                                    <strong>Mobile Number:</strong> {response.project?.mobile_number}
+                                    <strong>Mobile Number:</strong> {response?.project?.mobile_number}
                                 </p>
                             </div>
 
                             {/* === Invoice Info === */}
                             <div style={{ margin: 0 }}>
                                 <p style={{ margin: '0 0 0.35rem' }}>
-                                    <strong>Invoice Number:</strong> {response.invoice_number}
+                                    <strong>Invoice Number:</strong> {response?.invoice_number}
                                 </p>
-                                {response.project?.gst_number && (
+                                {response?.project?.gst_number && (
                                     <p style={{ margin: '0 0 0.35rem' }}>
-                                        <strong>GST Number:</strong> {response.project?.gst_number}
+                                        <strong>GST Number:</strong> {response?.project?.gst_number}
                                     </p>
                                 )}
                                 <p style={{ margin: 0 }}>

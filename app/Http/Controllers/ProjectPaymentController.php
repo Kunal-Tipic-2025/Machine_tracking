@@ -154,8 +154,17 @@ class ProjectPaymentController extends Controller
         $service = new \App\Services\InvoiceService();
         $totals = $service->calculateInvoiceTotals($payment);
 
-        // Combine relationships
-        $payment->loadMissing(['project', 'company', 'additionalCharges']);
+        // ✅ HYBRID FETCH: Load charges by ID (New Correct Way) OR Invoice Number (Old Legacy Way)
+        // This fixes the bug where duplicate invoice numbers caused "random" merged charges.
+        // New invoices will link by ID (Unique). Old ones stay visible.
+        $charges = \App\Models\InvoiceAdditionalCharge::where('invoice_id', (string)$payment->id)
+            ->orWhere('invoice_id', (string)$payment->invoice_number)
+            ->get();
+        
+        $payment->setRelation('additionalCharges', $charges);
+
+        // Load other relationships if missing
+        $payment->loadMissing(['project', 'company']); // removed additionalCharges from here since we set it manually
 
         return [
             'id' => $payment->id,

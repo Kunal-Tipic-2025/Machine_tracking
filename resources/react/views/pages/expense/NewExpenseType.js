@@ -29,7 +29,7 @@ const NewExpenseType = () => {
     name: '',
     slug: '',
     localName: '',
-    expense_category : '',
+    expense_category: '',
     desc: '',
     show: true,
   })
@@ -57,7 +57,7 @@ const NewExpenseType = () => {
     try {
       const resp = await post('/api/expenseType', data)
       if (resp?.id) {
-        showToast('success',t("MSG.expense_type_added_successfully_msg"));
+        showToast('success', t("MSG.expense_type_added_successfully_msg"));
         navigate('/expense/new');
       } else {
         showToast('danger', t("MSG.failed_to_add_expense_type_msg"));
@@ -72,7 +72,7 @@ const NewExpenseType = () => {
     setState({
       name: '',
       slug: '',
-      expense_category : '',
+      expense_category: '',
       localName: '',
       desc: '',
       show: true,
@@ -125,10 +125,9 @@ const NewExpenseType = () => {
                   feedbackInvalid="Please select an expense category."
                 >
                   <option value="">-- Select Category --</option>
-                  <option value="Operational Expense">Operational Expense</option>
-                  <option value="Capital Expense">Capital Expense</option>
                   <option value="Machine Expense">Machine Expense</option>
                   <option value="Operator Expense">Operator/Helper Expense</option>
+                  <option value="Other Expense">Other Expense</option>
                   {/* <option value="Helper Expense">Helper Expense</option> */}
                 </CFormSelect>
               </div>
@@ -156,11 +155,11 @@ const NewExpenseType = () => {
               </div>
               <div className="mb-3">
                 <CButton color="success" type="submit">
-                {t("LABELS.submit")}
+                  {t("LABELS.submit")}
                 </CButton>
                 &nbsp;
                 <CButton color="secondary" onClick={handleClear}>
-                {t("LABELS.clear")}
+                  {t("LABELS.clear")}
                 </CButton>
               </div>
             </CForm>
