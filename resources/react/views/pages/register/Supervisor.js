@@ -586,7 +586,8 @@ const SupervisorsList = () => {
       // -----------------------------------------------------------------
       // 4. Success flow
       // -----------------------------------------------------------------
-      showToast('success', 'Operators updated successfully');
+      const roleName = editSupervisor.type === 0 ? "Super Admin" : editSupervisor.type === 1 ? "Admin" : editSupervisor.type === 4 ? "Helper" : "Operator";
+      showToast('success', `${roleName} updated successfully`);
       setEditModal(false);
       setEditMachines({ adds: [], removes: [] });
       await Promise.all([fetchSupervisors(), fetchMachines()]);
@@ -1082,7 +1083,7 @@ const SupervisorsList = () => {
       {/* EDIT SUPERVISOR MODAL */}
       <CModal visible={editModal} onClose={() => setEditModal(false)} size="lg">
         <CModalHeader>
-          <CModalTitle>Edit Operator</CModalTitle>
+          <CModalTitle>Edit {editSupervisor ? (editSupervisor.type === 0 ? "Super Admin" : editSupervisor.type === 1 ? "Admin" : editSupervisor.type === 4 ? "Helper" : "Operator") : "Operator"}</CModalTitle>
         </CModalHeader>
         <CModalBody>
           {editSupervisor && (

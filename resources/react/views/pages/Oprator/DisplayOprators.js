@@ -826,7 +826,8 @@ const OperatorList = () => {
 
       await put(`/api/operators/${currentOperator.id}`, payload);
       setEditModal(false);
-      showToast("success", "User updated successfully.");
+      const roleName = getRoleText(currentOperator.type);
+      showToast("success", `${roleName} updated successfully`);
       fetchOperators();
     } catch (err) {
       console.error("Error updating user:", err);
@@ -1007,7 +1008,7 @@ const OperatorList = () => {
 
 
       <CModal visible={editModal} onClose={() => setEditModal(false)} size="lg">
-        <CModalHeader closeButton>Edit User</CModalHeader>
+        <CModalHeader closeButton>Edit {currentOperator ? getRoleText(currentOperator.type) : 'User'}</CModalHeader>
         <CModalBody>
           {currentOperator && (
             <CForm>
