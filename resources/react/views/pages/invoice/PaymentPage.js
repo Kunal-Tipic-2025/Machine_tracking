@@ -54,19 +54,15 @@ const PaymentPage = () => {
 
     //Adding work type
 
-    const fetchAdditionalCharges = async (invoiceNumber) => {
-        if (!invoiceNumber) return;
-
-        try {
-            const res = await getAPICall(
-                `/api/invoice-additional-charges/${invoiceNumber}`
-            );
-            setAdditionalCharges(res || []);
-        } catch (err) {
-            console.error('Failed to fetch additional charges', err);
-            showToast('danger', 'Failed to load additional charges');
+    // ✅ FIX: Use embedded additionalCharges from backend (Hybrid logic)
+    // Do NOT fetch manually by invoice_number, as it misses ID-linked charges.
+    // ✅ FIX: Use embedded additionalCharges from backend (Hybrid logic)
+    // Do NOT fetch manually by invoice_number, as it misses ID-linked charges.
+    useEffect(() => {
+        if (response?.additionalCharges) {
+            setAdditionalCharges(response.additionalCharges);
         }
-    };
+    }, [response]);
 
     const [workTypes, setWorkTypes] = useState([]);
     useEffect(() => {
@@ -186,18 +182,6 @@ const PaymentPage = () => {
     useEffect(() => {
         fetchPaymentData();
     }, [id]);
-
-    // useEffect(() => {
-    //     if (id) {
-    //         fetchAdditionalCharges();
-    //     }
-    // }, [id]);
-
-    useEffect(() => {
-        if (response?.invoice_number) {
-            fetchAdditionalCharges(response.invoice_number);
-        }
-    }, [response?.invoice_number]);
 
 
     //here now
@@ -662,7 +646,7 @@ const PaymentPage = () => {
                 remark: response.remark || '', // ✅ Pass Remark/Description
                 transaction_id: response.transaction_id || '', // ✅ Pass Transaction ID
                 totalAmount: response.base_total || 0, // ✅ Pass Base Total to prevent double counting
-                additionalCharges: additionalCharges || [],
+                additionalCharges: response.additionalCharges || [], // ✅ Use fresh data from API
             };
 
             showToast('success', 'Payment data loaded successfully');

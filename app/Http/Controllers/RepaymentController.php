@@ -297,10 +297,15 @@ class RepaymentController extends Controller
 
 
             // 1️⃣ Fetch invoices (oldest first)
-            $invoices = ProjectPayment::where('company_id', $companyId)
-                ->where('project_id', $validated['project_id'])
-                ->orderBy('created_at', 'asc')
-                ->get();
+            $query = ProjectPayment::where('company_id', $companyId)
+                ->where('project_id', $validated['project_id']);
+
+            // ✅ Targeted Payment Filter
+            if ($request->filled('invoice_id')) {
+                $query->where('invoice_number', $request->invoice_id);
+            }
+
+            $invoices = $query->orderBy('created_at', 'asc')->get();
 
             if ($invoices->isEmpty()) {
                 DB::rollBack();
@@ -316,10 +321,12 @@ class RepaymentController extends Controller
                 $invoiceRemaining = max(0, $invoice->total - $invoice->paid_amount);
                 $totalOutstanding += $invoiceRemaining;
 
-                $chargesOutstanding = \App\Models\InvoiceAdditionalCharge::where(
-                    'invoice_id',
-                    $invoice->invoice_number
-                )->sum(DB::raw('amount - IFNULL(paid_amount, 0)'));
+                // ✅ HYBRID FETCH: Match charges by ID (New) OR Number (Old)
+                $chargesOutstanding = \App\Models\InvoiceAdditionalCharge::where(function($q) use ($invoice) {
+                        $q->where('invoice_id', (string)$invoice->id)
+                          ->orWhere('invoice_id', (string)$invoice->invoice_number);
+                    })
+                    ->sum(DB::raw('amount - IFNULL(paid_amount, 0)'));
 
                 $totalOutstanding += max(0, $chargesOutstanding);
             }
@@ -413,10 +420,13 @@ class RepaymentController extends Controller
                 /** ---------------------------------
                  *  B. Settle ADDITIONAL CHARGES
                  * --------------------------------- */
-                $charges = \App\Models\InvoiceAdditionalCharge::where(
-                    'invoice_id',
-                    $invoice->invoice_number
-                )->orderBy('id', 'asc')->get();
+                // ✅ HYBRID FETCH: Match charges by ID (New) OR Number (Old)
+                $charges = \App\Models\InvoiceAdditionalCharge::where(function($q) use ($invoice) {
+                        $q->where('invoice_id', (string)$invoice->id)
+                          ->orWhere('invoice_id', (string)$invoice->invoice_number);
+                    })
+                    ->orderBy('id', 'asc')->get();
+
 
                 foreach ($charges as $charge) {
                     if ($remainingAllocation <= 0)

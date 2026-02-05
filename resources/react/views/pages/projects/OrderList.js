@@ -107,12 +107,12 @@ const OrderList = ({ projectId, inModal = false }) => {
             console.log(response);
             setOrders(response);
 
-            // Fetch additional charges using invoice_number
-            if (response?.invoice_number) {
-                const chargesResp = await getAPICall(`/api/invoice-additional-charges/${response.invoice_number}`);
-                setAdditionalCharges(chargesResp || []);
-                console.log('Additional Charges:', chargesResp);
+            // ✅ FIX: Use embedded additionalCharges from backend (Hybrid logic)
+            // Do NOT fetch manually by invoice_number, as it misses ID-linked charges.
+            if (response?.additionalCharges) {
+                setAdditionalCharges(response.additionalCharges);
             }
+
         } catch (error) {
             console.error('Error fetching orders:', error);
             showAlert('Failed to fetch orders', 'danger');
