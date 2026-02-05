@@ -219,7 +219,7 @@ const PaymentPage = () => {
         0
     );
 
-    const grandTotal = (Number(response?.total) || 0) + additionalTotal;
+    const grandTotal = (Number(response?.base_total) || 0) + additionalTotal;
 
     const startEditCharge = (charge) => {
         setEditingChargeId(charge.id);
@@ -660,7 +660,7 @@ const PaymentPage = () => {
                 is_fixed_bid: response.is_fixed_bid ?? false, // ✅ Pass Fixed Bid flag
                 remark: response.remark || '', // ✅ Pass Remark/Description
                 transaction_id: response.transaction_id || '', // ✅ Pass Transaction ID
-                totalAmount: response.total || 0, // ✅ Pass Total Amount
+                totalAmount: response.base_total || 0, // ✅ Pass Base Total to prevent double counting
                 additionalCharges: additionalCharges || [],
             };
 
