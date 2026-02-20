@@ -488,15 +488,25 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
     setSearchQuery(project.customer_name)
     setAllProjects([])
     filterMachinesByProject(project)
+    setSelectedMachineFilter('')
   }
+
+  const [selectedMachineFilter, setSelectedMachineFilter] = useState('')
 
   // Filter logs based on search query
   const searchFilteredLogs = useMemo(() => {
-    if (!logSearchQuery.trim()) return filteredLogs;
+    let logsToFilter = filteredLogs;
+
+    // 1. Filter by Selected Machine
+    if (selectedMachineFilter) {
+      logsToFilter = logsToFilter.filter(log => String(log.machine_id) === String(selectedMachineFilter));
+    }
+
+    if (!logSearchQuery.trim()) return logsToFilter;
 
     const query = logSearchQuery.toLowerCase();
 
-    return filteredLogs.filter((log) => {
+    return logsToFilter.filter((log) => {
       // Search in work type
       const workType = workTypeMap[log.work_type_id]?.toLowerCase() || '';
 
@@ -522,7 +532,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
         workDate.includes(query)
       );
     });
-  }, [filteredLogs, logSearchQuery, workTypeMap, operators, getMachineName, prices]);
+  }, [filteredLogs, logSearchQuery, workTypeMap, operators, getMachineName, prices, selectedMachineFilter]);
 
   const clearProject = () => {
     setForm((prev) => ({
@@ -542,6 +552,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
     setShowDropdown(false)
     setAllProjects([])
     setFilteredMachines([])
+    setSelectedMachineFilter('')
   }
 
   const handleAddCustomer = () => {
@@ -911,7 +922,15 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
     }
   }
 
-  // ✅ REMOVED: handleCheckboxChange function (no longer needed)
+  // Get machines that are actually present in the logs
+  const machinesInLogs = useMemo(() => {
+    if (!filteredLogs.length) return [];
+    const uniqueMachineIds = [...new Set(filteredLogs.map(l => String(l.machine_id)))];
+    return uniqueMachineIds.map(id => {
+      const machine = rows.find(r => String(r.id) === String(id));
+      return machine ? { id: machine.id, machine_name: machine.machine_name } : null;
+    }).filter(Boolean);
+  }, [filteredLogs, rows]);
 
   return (
     <CRow>
@@ -923,7 +942,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
           <CCardBody>
             <CForm validated={validated} onSubmit={submitInvoice}>
               <CRow className="mb-3">
-                <CCol md={6}>
+                <CCol md={4}>
                   <CFormLabel>Customer Name <span style={{ color: "red" }}>*</span></CFormLabel>
                   <div ref={projectInputRef} style={{ position: 'relative' }}>
                     <CInputGroup>
@@ -934,7 +953,7 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                           setSearchQuery(e.target.value)
                           setShowDropdown(true)
                         }}
-                        placeholder="Search by customer name, location, mobile..."
+                        placeholder="Search..."
                         required
                       />
                       <CInputGroupText>
@@ -1019,7 +1038,23 @@ const Invoice = ({ editMode = false, initialData = null, onSubmit = null }) => {
                   )}
                 </CCol>
 
-                <CCol md={6}>
+                <CCol md={4}>
+                  <CFormLabel>Select Machine</CFormLabel>
+                  <CFormSelect
+                    value={selectedMachineFilter}
+                    onChange={(e) => setSelectedMachineFilter(e.target.value)}
+                    disabled={!form.projectId}
+                  >
+                    <option value="">All Machines</option>
+                    {machinesInLogs.map((machine) => (
+                      <option key={machine.id} value={machine.id}>
+                        {machine.machine_name}
+                      </option>
+                    ))}
+                  </CFormSelect>
+                </CCol>
+
+                <CCol md={4}>
                   <CFormLabel>Invoice Date <span style={{ color: "red" }}>*</span></CFormLabel>
                   <CFormInput
                     type="date"

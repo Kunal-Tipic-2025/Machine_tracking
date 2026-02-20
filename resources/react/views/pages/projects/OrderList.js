@@ -552,8 +552,8 @@ const OrderList = ({ projectId, inModal = false }) => {
                                                         )}
                                                     </CTableDataCell>
                                                     <CTableDataCell className="text-center">
-                                                        <CBadge color={charge.is_paid ? "success" : "warning"}>
-                                                            {charge.is_paid ? "Paid" : "Pending"}
+                                                        <CBadge color={(charge.is_paid || isCompleted) ? "success" : (isDeduct ? "secondary" : "warning")}>
+                                                            {(charge.is_paid || isCompleted) ? "Paid" : (isDeduct ? "Applied" : "Pending")}
                                                         </CBadge>
                                                     </CTableDataCell>
                                                     <CTableDataCell className="text-end fw-bold" style={{ color: isDeduct ? 'red' : 'inherit' }}>

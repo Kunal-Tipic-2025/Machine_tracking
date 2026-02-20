@@ -723,7 +723,7 @@ const ProjectPaymentReport = () => {
     // };
 
     const handleDownloadHistoryPDF = async () => {
-        const payment = payments.find(p => p.invoice_number === selectedInvoice);
+        const payment = customerPayments.find(p => p.invoice_number === selectedInvoice);
         if (!payment) return;
 
         const filteredHistory = historyData.filter(e => e?.invoice_id === selectedInvoice);
@@ -1495,21 +1495,25 @@ const ProjectPaymentReport = () => {
                                     </CTableRow>
                                 </CTableHead>
                                 <CTableBody>
-                                    {selectedPaymentForCharges.additionalCharges.map((charge, idx) => (
-                                        <CTableRow key={charge.id}>
-                                            <CTableDataCell>{formatChargeType(charge.charge_type)}</CTableDataCell>
-                                            <CTableDataCell className="text-end">₹{Number(charge.amount).toFixed(2)}</CTableDataCell>
-                                            <CTableDataCell className="text-end text-success fw-bold">
-                                                ₹{Number(charge.paid_amount || 0).toFixed(2)}
-                                            </CTableDataCell>
-                                            <CTableDataCell>
-                                                <CBadge color={charge.is_paid ? "success" : "warning"}>
-                                                    {charge.is_paid ? "Paid" : "Pending"}
-                                                </CBadge>
-                                            </CTableDataCell>
-                                            <CTableDataCell>{charge.remark || '-'}</CTableDataCell>
-                                        </CTableRow>
-                                    ))}
+                                    {selectedPaymentForCharges.additionalCharges.map((charge, idx) => {
+                                        const isDeduct = charge.amount_deduct || charge.charge_definition?.amount_deduct;
+                                        const isInvoicePaid = (Number(selectedPaymentForCharges?.total || 0) - Number(selectedPaymentForCharges?.paid_amount || 0)) <= 0.01;
+                                        return (
+                                            <CTableRow key={charge.id}>
+                                                <CTableDataCell>{formatChargeType(charge.charge_type)}</CTableDataCell>
+                                                <CTableDataCell className="text-end">₹{Number(charge.amount).toFixed(2)}</CTableDataCell>
+                                                <CTableDataCell className="text-end text-success fw-bold">
+                                                    ₹{Number(charge.paid_amount || 0).toFixed(2)}
+                                                </CTableDataCell>
+                                                <CTableDataCell>
+                                                    <CBadge color={(charge.is_paid || isInvoicePaid) ? "success" : (isDeduct ? "secondary" : "warning")}>
+                                                        {(charge.is_paid || isInvoicePaid) ? "Paid" : (isDeduct ? "Applied" : "Pending")}
+                                                    </CBadge>
+                                                </CTableDataCell>
+                                                <CTableDataCell>{charge.remark || '-'}</CTableDataCell>
+                                            </CTableRow>
+                                        )
+                                    })}
                                 </CTableBody>
                             </CTable>
                         </div>
