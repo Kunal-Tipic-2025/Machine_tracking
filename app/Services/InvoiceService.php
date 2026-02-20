@@ -78,6 +78,7 @@ class InvoiceService
             'work_order_remaining' => max(0, $workOrderAmount - $workOrderPaid),
             'additional_charges_total' => $additionalChargesTotal,
             'additional_charges_paid' => $additionalChargesPaid,
+            'total_deductions' => $totalDeductions,
             'grand_total' => $grandTotal,
             'total_paid' => $totalPaid,
             'remaining_amount' => $remainingAmount,

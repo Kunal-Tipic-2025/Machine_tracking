@@ -316,19 +316,18 @@ class RepaymentController extends Controller
 
             // 2️⃣ Calculate TOTAL outstanding BEFORE mutation
             $totalOutstanding = 0;
+            $invoiceService = new \App\Services\InvoiceService();
 
             foreach ($invoices as $invoice) {
-                $invoiceRemaining = max(0, $invoice->total - $invoice->paid_amount);
-                $totalOutstanding += $invoiceRemaining;
-
                 // ✅ HYBRID FETCH: Match charges by ID (New) OR Number (Old)
-                $chargesOutstanding = \App\Models\InvoiceAdditionalCharge::where(function($q) use ($invoice) {
+                $charges = \App\Models\InvoiceAdditionalCharge::where(function($q) use ($invoice) {
                         $q->where('invoice_id', (string)$invoice->id)
                           ->orWhere('invoice_id', (string)$invoice->invoice_number);
-                    })
-                    ->sum(DB::raw('amount - IFNULL(paid_amount, 0)'));
+                })->get();
+                $invoice->setRelation('additionalCharges', $charges);
 
-                $totalOutstanding += max(0, $chargesOutstanding);
+                $totals = $invoiceService->calculateInvoiceTotals($invoice);
+                $totalOutstanding += $totals['remaining_amount'];
             }
 
             // 3️⃣ Reject overpayment
@@ -361,7 +360,8 @@ class RepaymentController extends Controller
                 /** -------------------------------
                  *  A. Settle INVOICE amount
                  * ------------------------------- */
-                $invoiceRemaining = max(0, $invoice->total - $invoice->paid_amount);
+                $totals = $invoiceService->calculateInvoiceTotals($invoice);
+                $invoiceRemaining = max(0, ($invoice->total - $totals['total_deductions']) - $invoice->paid_amount);
 
                 if ($invoiceRemaining > 0) {
                     $invoicePayment = min($invoiceRemaining, $remainingAllocation);
@@ -420,17 +420,13 @@ class RepaymentController extends Controller
                 /** ---------------------------------
                  *  B. Settle ADDITIONAL CHARGES
                  * --------------------------------- */
-                // ✅ HYBRID FETCH: Match charges by ID (New) OR Number (Old)
-                $charges = \App\Models\InvoiceAdditionalCharge::where(function($q) use ($invoice) {
-                        $q->where('invoice_id', (string)$invoice->id)
-                          ->orWhere('invoice_id', (string)$invoice->invoice_number);
-                    })
-                    ->orderBy('id', 'asc')->get();
-
+                $charges = $invoice->additionalCharges;
 
                 foreach ($charges as $charge) {
                     if ($remainingAllocation <= 0)
                         break;
+                    
+                    if ($charge->amount_deduct) continue; // Skip deductive charges
 
                     $chargeRemaining = max(0, $charge->amount - ($charge->paid_amount ?? 0));
 

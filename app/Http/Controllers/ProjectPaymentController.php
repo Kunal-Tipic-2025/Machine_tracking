@@ -514,9 +514,18 @@ class ProjectPaymentController extends Controller
 
         try {
             // Step 1: Calculate remaining amount for invoice
+            $invoiceService = new \App\Services\InvoiceService();
+            $charges = \App\Models\InvoiceAdditionalCharge::where(function($q) use ($payment) {
+                    $q->where('invoice_id', (string)$payment->id)
+                      ->orWhere('invoice_id', (string)$payment->invoice_number);
+                })->orderBy('id', 'asc')->get();
+            $payment->setRelation('additionalCharges', $charges);
+            
+            $totals = $invoiceService->calculateInvoiceTotals($payment);
+
             $invoiceTotal = (float) $payment->total;
             $invoiceAlreadyPaid = (float) $payment->paid_amount;
-            $invoiceRemaining = $invoiceTotal - $invoiceAlreadyPaid;
+            $invoiceRemaining = max(0, ($invoiceTotal - $totals['total_deductions']) - $invoiceAlreadyPaid);
 
             $remainingPayment = $incomingPayment;
 
@@ -529,13 +538,12 @@ class ProjectPaymentController extends Controller
             }
 
             // Step 3: Get additional charges for this invoice (in order)
-            $additionalCharges = \App\Models\InvoiceAdditionalCharge::where('invoice_id', $payment->invoice_number)
-                ->orderBy('id', 'asc')
-                ->get();
+            $additionalCharges = $payment->additionalCharges;
 
             $chargesSettled = [];
 
             $additionalChargesOutstanding = $additionalCharges->sum(function ($c) {
+                if ($c->amount_deduct) return 0;
                 return max(0, (float) $c->amount - (float) ($c->paid_amount ?? 0));
             });
 
@@ -545,6 +553,8 @@ class ProjectPaymentController extends Controller
                 foreach ($additionalCharges as $charge) {
                     if ($remainingPayment <= 0)
                         break;
+                    
+                    if ($charge->amount_deduct) continue;
 
                     $chargeTotal = (float) $charge->amount;
                     $chargeAlreadyPaid = (float) ($charge->paid_amount ?? 0);
